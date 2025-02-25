@@ -88,18 +88,12 @@ describe("DEx v3 Testing", () => {
   let ETH_ClassKey: TokenClassKey;
   let USDT_ClassKey: TokenClassKey;
   let USDC_ClassKey: TokenClassKey;
-  let BTC_ClassKey: TokenClassKey;
-  let BNB_ClassKey: TokenClassKey;
-  let SOL_ClassKey: TokenClassKey;
   let MATIC_ClassKey: TokenClassKey;
 
   beforeAll(async () => {
     ETH_ClassKey = Object.assign(new TokenClassKey(), TOKENS.ETH.KEY);
     USDT_ClassKey = Object.assign(new TokenClassKey(), TOKENS.USDT.KEY);
     USDC_ClassKey = Object.assign(new TokenClassKey(), TOKENS.USDC.KEY);
-    BTC_ClassKey = Object.assign(new TokenClassKey(), TOKENS.BTC.KEY);
-    BNB_ClassKey = Object.assign(new TokenClassKey(), TOKENS.BNB.KEY);
-    SOL_ClassKey = Object.assign(new TokenClassKey(), TOKENS.SOL.KEY);
     MATIC_ClassKey = Object.assign(new TokenClassKey(), TOKENS.MATIC.KEY);
     client = await TestClients.createForAdmin(contractConfig);
     user = await client.createRegisteredUser();
@@ -112,6 +106,63 @@ describe("DEx v3 Testing", () => {
     const response = await client.dexV3Contract.GetContractAPI();
     expect(response).toEqual(transactionSuccess());
   });
+
+  test("Creating Test Gala for Test", async () => {
+    // Creating Gala Dummy token for Buying
+    // Minting 100,000,000GALA  to user1
+
+    const classKey = new TokenClassKey();
+
+    classKey.collection = "GALA";
+    classKey.category = "Unit";
+    classKey.type = "none";
+    classKey.additionalKey = "none";
+
+    const tokenClassDto = new CreateTokenClassDto();
+
+    tokenClassDto.tokenClass = classKey;
+    tokenClassDto.name = "GALA";
+    tokenClassDto.symbol = "gala";
+    tokenClassDto.description = "TEST TEST";
+    tokenClassDto.image = "www.resolveUserAlias.com";
+    tokenClassDto.decimals = 8;
+    tokenClassDto.maxSupply = new BigNumber("3e+7");
+    tokenClassDto.maxCapacity = new BigNumber("3e+7");
+    tokenClassDto.totalMintAllowance = new BigNumber(0);
+    tokenClassDto.totalSupply = new BigNumber(0);
+    tokenClassDto.totalBurned = new BigNumber(0);
+    tokenClassDto.network = "GC";
+    tokenClassDto.isNonFungible = false;
+
+    tokenClassDto.sign(user.privateKey);
+
+    await client.token.CreateToken(tokenClassDto);
+
+    const mintDTO = new MintTokenWithAllowanceDto();
+
+    mintDTO.tokenClass = classKey;
+    mintDTO.quantity = new BigNumber("3e+7");
+    mintDTO.owner = user.identityKey;
+    mintDTO.tokenInstance = new BigNumber(0);
+
+    mintDTO.sign(user.privateKey);
+
+    const user1Balance = await client.token.MintTokenWithAllowance(mintDTO);
+    const fetchBalancesDto = new FetchBalancesDto();
+    fetchBalancesDto.owner = user.identityKey;
+    const fetchBalanceRes = await client.tokenContract.FetchBalances(fetchBalancesDto);
+    const balancesData = fetchBalanceRes.Data;
+    if (balancesData) {
+      for (const balance of balancesData) {
+        balance.getQuantityTotal = function (): BigNumber {
+          return this.quantity;
+        };
+        const balanceN = balance.getQuantityTotal();
+        expect(balanceN).toEqual("10");
+      }
+    }
+    
+  })
 
   describe("creating tokens", () => {
     const GENERAL = {
