@@ -30,8 +30,7 @@ export class LaunchpadFeeConfig extends ChainObject {
   feeAddress: string;
 
   @ArrayNotEmpty()
-  @ValidateNested({ each: true })
-  @Type(() => String)
+  @IsString({ each: true })
   authorities: string[];
 
   constructor(feeAddress: string, authorities: string[]) {
