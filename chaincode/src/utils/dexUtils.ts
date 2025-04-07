@@ -12,7 +12,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { ChainError, DexFeeConfig, ErrorCode, TokenClassKey, ValidationFailedError } from "@gala-chain/api";
+import {
+  ChainError,
+  DexDecimalLimit,
+  DexFeeConfig,
+  ErrorCode,
+  TokenClassKey,
+  ValidationFailedError
+} from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { GalaChainContext } from "../types";
@@ -119,6 +126,24 @@ export function parseNftId(nftId: string): { batchNumber: string; instanceId: Bi
     batchNumber: parts[0],
     instanceId: new BigNumber(parts[1])
   };
+}
+
+export async function validateDecimal(ctx: GalaChainContext, amounts: BigNumber[]) {
+  const key = ctx.stub.createCompositeKey(DexDecimalLimit.INDEX_KEY, []);
+  let dexDecimalLimit = await getObjectByKey(ctx, DexDecimalLimit, key).catch(() => undefined);
+  const maxDecimals = dexDecimalLimit?.maxDecimals ?? 18;
+
+  for (const amount of amounts) {
+    const decimalPlaces = amount.decimalPlaces();
+    if (decimalPlaces === null) {
+      continue;
+    }
+    if (decimalPlaces > maxDecimals) {
+      throw new Error(
+        `Invalid decimal places for ${amount}. Max allowed: ${maxDecimals}, Found: ${decimalPlaces}`
+      );
+    }
+  }
 }
 
 export function genKey(...params: string[] | number[]): string {

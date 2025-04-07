@@ -844,3 +844,18 @@ export class NftBatchLimitDto extends ChainCallDTO {
   @IsNonZeroBigNumber()
   newMaxSupply: BigNumber;
 }
+
+export class SetDecimalLimitRes {
+  @IsNumber()
+  public newDecimalLimit: number;
+}
+
+export class SetDecimalLimitDto extends ChainCallDTO {
+  @IsNumber()
+  public decimalLimit: number;
+
+  constructor(decimalLimit: number) {
+    super();
+    this.decimalLimit = decimalLimit;
+  }
+}

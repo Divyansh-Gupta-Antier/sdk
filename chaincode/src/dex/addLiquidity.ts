@@ -31,7 +31,7 @@ import { fetchOrCreateBalance } from "../balances";
 import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
-import { getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
+import { getObjectByKey, putChainObject, validateDecimal, validateTokenOrder } from "../utils";
 import { assignPositionNft, fetchUserPositionNftId } from "./positionNft";
 
 /**
@@ -47,6 +47,7 @@ export async function addLiquidity(
   launchpadAddress?: string
 ): Promise<AddLiquidityResDto> {
   const [token0, token1] = validateTokenOrder(dto.token0, dto.token1);
+  await validateDecimal(ctx, [dto.amount0Desired, dto.amount1Desired, dto.amount0Min, dto.amount1Min]);
 
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key).catch((e) => {
