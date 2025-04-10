@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { ChainError, DexFeeConfig, ErrorCode, TokenClassKey, TokenInstanceKey } from "@gala-chain/api";
+import { ChainError, DexFeeConfig, ErrorCode, TokenClassKey } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { GalaChainContext } from "../types";
@@ -23,12 +23,12 @@ import { getObjectByKey } from "./state";
  * @param arr It will sort array for string
  * @returns It will return modified array with sorted according to lexiographical order
  */
-export const sortString = (arr: string[]) => {
+export function sortString(arr: string[]) {
   const sortedArr = [...arr].sort((a, b) => a.localeCompare(b));
   const isChanged = !arr.every((val, index) => val === sortedArr[index]);
 
   return { sortedArr, isChanged };
-};
+}
 
 /**
  *
@@ -36,19 +36,20 @@ export const sortString = (arr: string[]) => {
  * @param idx Element1 to swap
  * @param idx2 Element2 to swap
  */
-export const swapAmounts = (arr: string[] | BigNumber[], idx = 0, idx2 = 1) => {
+export function swapAmounts(arr: string[] | BigNumber[], idx = 0, idx2 = 1) {
   const temp = arr[idx];
   arr[idx] = arr[idx2];
   arr[idx2] = temp;
-};
+}
+
 /**
  *
  * @param address address of pool in string
  * @returns
  */
-export const virtualAddress = (address: string) => {
-  return "service|" + address;
-};
+export function virtualAddress(address: string) {
+  return `service|pool_${address}`;
+}
 
 /**
  * @dev it will round down the Bignumber to 18 decimals
@@ -56,23 +57,23 @@ export const virtualAddress = (address: string) => {
  * @param round
  * @returns
  */
-export const f18 = (BN: BigNumber, round: BigNumber.RoundingMode = BigNumber.ROUND_DOWN): BigNumber =>
-  new BigNumber(BN.toFixed(18, round));
-
-export const generateKeyFromClassKey = (obj: TokenClassKey) => {
-  return Object.assign(new TokenClassKey(), obj).toStringKey().replace(/\|/g, ":") || "";
-};
-
-export function convertToTokenInstanceKey(tokenClassKey: TokenClassKey): TokenInstanceKey {
-  return Object.assign(new TokenInstanceKey(), {
-    collection: tokenClassKey.collection,
-    category: tokenClassKey.category,
-    type: tokenClassKey.type,
-    additionalKey: tokenClassKey.additionalKey,
-    instance: new BigNumber(0)
-  });
+export function f18(BN: BigNumber, round: BigNumber.RoundingMode = BigNumber.ROUND_DOWN): BigNumber {
+  return new BigNumber(BN.toFixed(18, round));
 }
 
+export function generateKeyFromClassKey(obj: TokenClassKey) {
+  return obj.toStringKey().replace(/\|/g, ":") || "";
+}
+
+/**
+ * Validates the order of two TokenClassKey instances.
+ * Ensures token0 is lexicographically smaller than token1 and that both are distinct.
+ *
+ * @param token0 First token
+ * @param token1 Second token
+ * @returns A tuple of normalized and sorted token keys
+ * @throws Error if tokens are the same or in the wrong order
+ */
 export function validateTokenOrder(token0: TokenClassKey, token1: TokenClassKey) {
   const [normalizedToken0, normalizedToken1] = [token0, token1].map(generateKeyFromClassKey);
 
@@ -96,6 +97,14 @@ export function genKeyWithPipe(...params: string[] | number[]): string {
   return params.join("_");
 }
 
+/**
+ * Fetches the Dex protocol fee configuration from the chain context.
+ * Returns undefined if the config is not found.
+ *
+ * @param ctx GalaChain context containing the chain stub
+ * @returns A Promise resolving to the DexFeeConfig or undefined
+ * @throws ChainError if an unexpected error occurs during retrieval
+ */
 export async function fetchDexProtocolFeeConfig(ctx: GalaChainContext): Promise<DexFeeConfig | undefined> {
   const key = ctx.stub.createCompositeKey(DexFeeConfig.INDEX_KEY, []);
 

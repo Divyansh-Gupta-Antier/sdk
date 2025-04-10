@@ -34,6 +34,8 @@ import {
   computeSwapStep,
   feeAmountTickSpacing,
   flipTick,
+  genKey,
+  genPoolAlias,
   getAmount0Delta,
   getAmount1Delta,
   getFeeGrowthInside,
@@ -629,5 +631,21 @@ export class Pool extends ChainObject {
     positionData.feeGrowthInside1Last = feeGrowthInside1.toString();
 
     return [tokensOwed0, tokensOwed1];
+  }
+
+  /**
+   * @dev returns unique address key of this pool
+   * @returns poolAddrKey which uniquely identifies this pool
+   */
+  public getPoolAddrKey() {
+    return genKey(this.token0, this.token1, this.fee.toString());
+  }
+
+  /**
+   * @dev returns service address which holds the pool's liquidity
+   * @returns poolVirtualAddress
+   */
+  public getPoolAlias() {
+    return genPoolAlias(this.getPoolAddrKey());
   }
 }

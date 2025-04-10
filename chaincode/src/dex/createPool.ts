@@ -17,13 +17,14 @@ import {
   CreatePoolDto,
   DexFeeConfig,
   Pool,
+  TokenInstanceKey,
   ValidationFailedError,
   feeAmountTickSpacing
 } from "@gala-chain/api";
 
 import { fetchTokenClass } from "../token";
 import { GalaChainContext } from "../types";
-import { convertToTokenInstanceKey, generateKeyFromClassKey, getObjectByKey, putChainObject } from "../utils";
+import { generateKeyFromClassKey, getObjectByKey, putChainObject } from "../utils";
 
 /**
  * @dev The createPool function initializes a new Uniswap V3 liquidity pool within the GalaChain ecosystem. It sets up the pool with the specified token pair, initial price, fee structure, and protocol fee settings.
@@ -66,8 +67,8 @@ export async function createPool(ctx: GalaChainContext, dto: CreatePoolDto): Pro
   );
 
   //create tokenInstanceKeys
-  const token0InstanceKey = convertToTokenInstanceKey(pool.token0ClassKey);
-  const token1InstanceKey = convertToTokenInstanceKey(pool.token1ClassKey);
+  const token0InstanceKey = TokenInstanceKey.fungibleKey(pool.token0ClassKey);
+  const token1InstanceKey = TokenInstanceKey.fungibleKey(pool.token1ClassKey);
 
   //check if the tokens are valid or not
   const token0Class = await fetchTokenClass(ctx, token0InstanceKey);

@@ -17,6 +17,7 @@ import {
   ConflictError,
   NotFoundError,
   Pool,
+  TokenInstanceKey,
   UserBalanceResDto,
   UserPosition
 } from "@gala-chain/api";
@@ -27,7 +28,6 @@ import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
 import {
-  convertToTokenInstanceKey,
   genKey,
   getObjectByKey,
   putChainObject,
@@ -78,7 +78,7 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
   }
   await putChainObject(ctx, pool);
   //create tokenInstanceKeys
-  const tokenInstanceKeys = [pool.token0ClassKey, pool.token1ClassKey].map(convertToTokenInstanceKey);
+  const tokenInstanceKeys = [pool.token0ClassKey, pool.token1ClassKey].map(TokenInstanceKey.fungibleKey);
 
   //fetch token classes
   const tokenClasses = await Promise.all(tokenInstanceKeys.map((key) => fetchTokenClass(ctx, key)));

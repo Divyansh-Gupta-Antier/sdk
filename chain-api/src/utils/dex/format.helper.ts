@@ -16,7 +16,16 @@ import BigNumber from "bignumber.js";
 
 import { ConflictError } from "../error";
 
-export const requirePosititve = (...params) => {
+/**
+ *
+ * @param poolId poolId of pool in string
+ * @returns
+ */
+export function genPoolAlias(poolId: string) {
+  return `service|pool_${poolId}`;
+}
+
+export function requirePosititve(...params) {
   for (const positive of params) {
     if (positive instanceof BigNumber) {
       if (positive.lt(new BigNumber(0))) {
@@ -24,4 +33,8 @@ export const requirePosititve = (...params) => {
       }
     }
   }
-};
+}
+
+export function genKey(...params: string[] | number[]): string {
+  return params.join("_").replace(/\|/g, ":");
+}
