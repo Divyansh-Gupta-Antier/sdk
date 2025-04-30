@@ -118,6 +118,7 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
     ctx.callingUser,
     tokenInstanceKeys[1]
   );
+  
   const response = new UserBalanceResDto(liquidityProviderToken0Balance, liquidityProviderToken1Balance);
   return response;
 }

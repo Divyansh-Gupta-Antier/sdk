@@ -22,7 +22,7 @@
     "update-snapshot": "jest --updateSnapshot"
   },
   "dependencies": {
-    "@gala-chain/api": "1.8.1",
+    "@gala-chain/api": "file:gala-chain-api-1.8.1.tgz",
     "@gala-chain/chaincode": "1.8.1",
     "@grpc/grpc-js": "1.10.10",
     "dotenv": "^16.0.1",
@@ -31,8 +31,8 @@
   },
   "devDependencies": {
     "@gala-chain/cli": "1.8.1",
-    "@gala-chain/client": "1.8.1",
-    "@gala-chain/test": "1.8.1",
+    "@gala-chain/client": "file:gala-chain-client-1.8.1.tgz",
+    "@gala-chain/test": "file:gala-chain-test-1.8.1.tgz",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "@types/jest": "^29.5.12",
     "@types/node": "18.11.9",
