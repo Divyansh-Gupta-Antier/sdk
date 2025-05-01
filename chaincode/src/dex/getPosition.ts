@@ -1,0 +1,55 @@
+/*
+ * Copyright (c) Gala Games Inc. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import { DexPosition, GetPositionDto, NotFoundError, getFeeGrowthInside, sqrtPriceToTick } from "@gala-chain/api";
+import BigNumber from "bignumber.js";
+
+import { GalaChainContext } from "../types";
+import { getPoolData } from "./getFunctions";
+import { fetchUserPositionInTickRange } from "./positionNft";
+
+/**
+ * @dev The positions function retrieves details of a specific liquidity position within a Uniswap V3 pool on the GalaChain ecosystem. It provides insights into the user's position, including token amounts, fees, and other state variables.
+ * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
+ * @param dto GetPositionDto - A data transfer object containing:
+ - Pool identifiers – Class keys or token details required to identify the pool.
+ - Positions identifier - lower tick, upper tick.
+ * @returns DexPosition
+ */
+export async function getPosition(ctx: GalaChainContext, dto: GetPositionDto): Promise<DexPosition> {
+  // Fetch pool data based on input
+  const pool = await getPoolData(ctx, dto);
+  if (!pool) throw new NotFoundError("No pool for these tokens and fee exists");
+
+  // Fetch nftId using owner and tick range
+  const position = await fetchUserPositionInTickRange(ctx, pool, dto.tickUpper, dto.tickLower, dto.owner);
+
+  if (!position) {
+    throw new NotFoundError(`User doesn't hold any positions with this tick range in this pool`);
+  }
+
+  // Estimate and update tokens owed
+  const tickCurrent = sqrtPriceToTick(pool.sqrtPrice);
+  const [feeGrowthInside0, feeGrowthInside1] = getFeeGrowthInside(
+    pool.tickData,
+    position.tickLower,
+    position.tickUpper,
+    tickCurrent,
+    pool.feeGrowthGlobal0,
+    pool.feeGrowthGlobal1
+  );
+
+  position.updatePosition(new BigNumber(0), feeGrowthInside0, feeGrowthInside1);
+  return position;
+}

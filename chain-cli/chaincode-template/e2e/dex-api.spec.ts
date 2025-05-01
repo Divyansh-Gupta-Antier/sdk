@@ -800,9 +800,9 @@ describe("DEx v3 Testing", () => {
         ETH_ClassKey,
         USDT_ClassKey,
         fee,
-        user.identityKey,
         ta,
-        tb
+        tb,
+        user.identityKey
       ).signed(user.privateKey);
       const positionRes = await client.dexV3Contract.getPositions(getPositionDto);
       expect(positionRes.Data).toMatchObject({
@@ -836,6 +836,8 @@ describe("DEx v3 Testing", () => {
         new BigNumber("92271.497628802094407217"),
         ta,
         tb,
+        new BigNumber(0),
+        new BigNumber(0),
         user.identityKey
       );
       const removeLiqEstimation = await client.dexV3Contract.burnEstimate(dto);
@@ -894,6 +896,8 @@ describe("DEx v3 Testing", () => {
         new BigNumber("92271.497628802094407217"),
         ta,
         tb,
+        new BigNumber(0),
+        new BigNumber(0),
         user.identityKey
       );
       const removeLiqEstimation = await client.dexV3Contract.burnEstimate(dto);
@@ -948,9 +952,9 @@ describe("DEx v3 Testing", () => {
         ETH_ClassKey,
         USDT_ClassKey,
         fee,
-        user.identityKey,
         ta,
-        tb
+        tb,
+        user.identityKey
       ).signed(user.privateKey);
       const positionRes = await client.dexV3Contract.getPositions(getPositionDto);
       expect(positionRes.Data).toMatchObject({
@@ -1036,9 +1040,9 @@ describe("DEx v3 Testing", () => {
         ETH_ClassKey,
         USDT_ClassKey,
         fee,
-        user.identityKey,
         ta,
-        tb
+        tb,
+        user.identityKey
       ).signed(user.privateKey);
       const position = await client.dexV3Contract.getPositions(getPositionDto);
       expect(position.Data).toBeUndefined();
@@ -1079,6 +1083,8 @@ describe("DEx v3 Testing", () => {
         new BigNumber("2060.753664493334613554"),
         ta,
         tb,
+        new BigNumber(0),
+        new BigNumber(0),
         user.identityKey
       );
       dto.sign(user.privateKey);
@@ -1408,9 +1414,9 @@ describe("DEx v3 Testing", () => {
         ETH_ClassKey,
         USDT_ClassKey,
         fee,
-        user.identityKey,
         ta,
-        tb
+        tb,
+        user.identityKey
       ).signed(user.privateKey);
       const position = await client.dexV3Contract.getPositions(getPositionDto);
       expect(position.Data).toMatchObject({
@@ -1433,6 +1439,8 @@ describe("DEx v3 Testing", () => {
         new BigNumber("26675.915083949831428038"),
         ta,
         tb,
+        new BigNumber(0),
+        new BigNumber(0),
         user.identityKey
       );
 
@@ -1487,9 +1495,9 @@ describe("DEx v3 Testing", () => {
         ETH_ClassKey,
         USDT_ClassKey,
         fee,
-        user.identityKey,
         ta,
-        tb
+        tb,
+        user.identityKey
       ).signed(user.privateKey);
       const position = await client.dexV3Contract.getPositions(getPositionDto);
       expect(position.Data).toBeUndefined();
@@ -1509,9 +1517,9 @@ describe("DEx v3 Testing", () => {
         ta,
         tb
       ).signed(user.privateKey);
-      const poolVirtualAddress = `service|${ETH}_${USDT}_500`;
+      const poolAlias = `service|${ETH}_${USDT}_500`;
       const fetchBalanceDto = new FetchBalancesDto();
-      fetchBalanceDto.owner = poolVirtualAddress;
+      fetchBalanceDto.owner = poolAlias;
       await client.dexV3Contract.collect(dto);
       await client.tokenContract.FetchBalances(fetchBalanceDto);
       const getPositionsDto = new GetUserPositionsDto(user.identityKey).signed(user.privateKey);
@@ -1590,9 +1598,9 @@ describe("DEx v3 Testing", () => {
         ETH_ClassKey,
         USDT_ClassKey,
         fee,
-        user.identityKey,
         ta,
-        tb
+        tb,
+        user.identityKey
       ).signed(user.privateKey);
       const positionRes = await client.dexV3Contract.getPositions(getPositionDto);
       expect(positionRes.Data).toBeUndefined();
@@ -1841,6 +1849,8 @@ describe("DEx v3 Testing", () => {
         new BigNumber("928.637339589079235191"),
         ta,
         tb,
+        new BigNumber(0),
+        new BigNumber(0),
         user.identityKey
       );
 
@@ -2068,10 +2078,10 @@ describe("DEx v3 Testing", () => {
         token1Slipped
       ).signed(user.privateKey);
 
-      const poolVirtualAddress = "service|ETH_USDT_500";
+      const poolAlias = "service|ETH_USDT_500";
 
       const fetchBalanceDto = new FetchBalancesDto();
-      fetchBalanceDto.owner = poolVirtualAddress;
+      fetchBalanceDto.owner = poolAlias;
       await client.tokenContract.FetchBalances(fetchBalanceDto);
       const fetchBalanceDtouser = new FetchBalancesDto();
       fetchBalanceDtouser.owner = user.identityKey;
@@ -2397,9 +2407,9 @@ describe("DEx v3 Testing", () => {
   });
 
   async function checkBalanceOfPool(token0: string, token1: string, fee: number) {
-    const poolVirtualAddress = `service|${token0}_${token1}_${fee}`;
+    const poolAlias = `service|${token0}_${token1}_${fee}`;
     const fetchBalanceDto = new FetchBalancesDto();
-    fetchBalanceDto.owner = poolVirtualAddress;
+    fetchBalanceDto.owner = poolAlias;
 
     return await client.tokenContract.FetchBalances(fetchBalanceDto);
   }

@@ -29,7 +29,7 @@ import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
 import { convertToTokenInstanceKey, getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
-import { assignPositionNft, fetchUserPositionNftId } from "./positionNft";
+import { createPosition, fetchUserPositionInTickRange } from "./positionNft";
 
 /**
  * @dev Function to add Liqudity to v3 pool. The addLiquidity function facilitates the addition of liquidity to a Uniswap V3 pool within the GalaChain ecosystem. It takes in the blockchain context, liquidity parameters, and an optional launchpad address, then executes the necessary operations to deposit assets into the specified liquidity pool.
@@ -79,13 +79,13 @@ export async function addLiquidity(
     amount1Desired
   );
 
-  const poolAddrKey = pool.getPoolAddrKey();
-  const poolVirtualAddress = pool.getPoolAlias();
-  const positionNftId =
-    (await fetchUserPositionNftId(ctx, pool, dto.tickUpper.toString(), dto.tickLower.toString())) ??
-    (await assignPositionNft(ctx, poolAddrKey, poolVirtualAddress));
+  const poolHash = pool.genPoolHash();
+  const poolAlias = pool.getPoolAlias();
+  const position =
+    (await fetchUserPositionInTickRange(ctx, pool, dto.tickUpper, dto.tickLower)) ??
+    (await createPosition(ctx, poolHash, poolAlias, dto.tickUpper, dto.tickLower));
 
-  let [amount0, amount1] = pool.mint(positionNftId, tickLower, tickUpper, liquidity.f18());
+  let [amount0, amount1] = pool.mint(position, tickLower, tickUpper, liquidity.f18());
   [amount0, amount1] = [amount0.f18(), amount1.f18()];
 
   if (
@@ -117,7 +117,7 @@ export async function addLiquidity(
     // transfer token0
     await transferToken(ctx, {
       from: liquidityProvider,
-      to: poolVirtualAddress,
+      to: poolAlias,
       tokenInstanceKey: token0InstanceKey,
       quantity: new BigNumber(amount0).decimalPlaces(token0Class.decimals, BigNumber.ROUND_DOWN),
       allowancesToUse: [],
@@ -131,7 +131,7 @@ export async function addLiquidity(
     // transfer token1
     await transferToken(ctx, {
       from: liquidityProvider,
-      to: poolVirtualAddress,
+      to: poolAlias,
       tokenInstanceKey: token1InstanceKey,
       quantity: new BigNumber(amount1).decimalPlaces(token1Class.decimals, BigNumber.ROUND_DOWN),
       allowancesToUse: [],

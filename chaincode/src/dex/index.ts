@@ -22,3 +22,6 @@ export * from "./quoteFuncs";
 export * from "./swap";
 export * from "./setProtocolFee";
 export * from "./collectTradingFees";
+export * from "./getPosition";
+export * from "./getPositionWithNftId";
+export * from "./getUserPositions";

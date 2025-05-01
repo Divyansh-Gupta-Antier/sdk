@@ -14,6 +14,7 @@
  */
 import {
   ChainError,
+  DexPosition,
   ErrorCode,
   MintTokenDto,
   NotFoundError,
@@ -28,48 +29,64 @@ import { keccak256 } from "js-sha3";
 
 import { fetchBalances } from "../balances";
 import { mintTokenWithAllowance } from "../mint";
-import { createTokenClass } from "../token";
+import { createTokenClass, updateTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
-import { genKey, parseNftId } from "../utils";
+import { fetchDexPosition, genNftId, parseNftId, putChainObject } from "../utils";
 import { fetchDexNftBatchLimit } from "./fetchDexNftBatchLimit";
 
 const LIQUIDITY_TOKEN_COLLECTION = "DexNFT";
 const LIQUIDITY_TOKEN_CATEGORY = "LiquidityPositions";
 
 /**
- * @dev Function to assign an NFT position within a specified pool. The assignPositionNft function
- *      retrieves the existing NFTs for the given pool and assigns a new position. If no NFTs are
- *      found, a new batch is generated. If the last NFT contains only one instance, an additional
- *      batch is created.
+ * @dev Assigns a new position NFT within a specified pool. This function ensures that there are
+ *      available NFTs for assignment. If no NFTs are present, it generates a new batch. If the last
+ *      available NFT has only one instance remaining, a new batch is also created to prevent exhaustion.
+ *      After assignment, it creates and stores a new DexPosition associated with the assigned NFT.
  *
- * @param ctx GalaChainContext – The execution context that provides access to the GalaChain environment.
- * @param poolAddrKey string – The unique key identifying the NFT pool.
- * @param poolAlias string – The virtual address associated with the pool.
+ * @param ctx GalaChainContext – The execution context for the GalaChain environment.
+ * @param poolHash string – The unique identifier for the DEX pool.
+ * @param poolAlias string – The virtual address representing the pool.
+ * @param tickUpper number – The upper tick boundary for the new position.
+ * @param tickLower number – The lower tick boundary for the new position.
  *
- * @returns string – The transaction result of transferring the assigned NFT.
- */ export async function assignPositionNft(
+ * @returns DexPosition – The newly created DexPosition object associated with the assigned NFT.
+ */
+export async function createPosition(
   ctx: GalaChainContext,
-  poolAddrKey: string,
-  poolAlias: string
-): Promise<string> {
-  let nfts = await fetchPositionNfts(ctx, poolAddrKey, poolAlias);
+  poolHash: string,
+  poolAlias: string,
+  tickUpper: number,
+  tickLower: number
+): Promise<DexPosition> {
+  // Fetch existing NFTs for the given pool
+  let nfts = await fetchPositionNfts(ctx, poolHash, poolAlias);
   let lastNft = nfts.at(-1);
 
+  // If no NFTs found, generate a new batch
   if (!lastNft) {
-    await generatePositionNftBatch(ctx, "1", poolAddrKey, poolAlias);
-    nfts = await fetchPositionNfts(ctx, poolAddrKey, poolAlias);
+    await generatePositionNftBatch(ctx, "1", poolHash, poolAlias);
+    nfts = await fetchPositionNfts(ctx, poolHash, poolAlias);
     lastNft = nfts.at(-1)!;
-  } else if (lastNft.getNftInstanceIds().length === 1) {
+  }
+  // If the last NFT has only one instance, prepare the next batch
+  else if (lastNft.getNftInstanceIds().length === 1) {
     await generatePositionNftBatch(
       ctx,
       new BigNumber(lastNft.additionalKey).plus(1).toString(),
-      poolAddrKey,
+      poolHash,
       poolAlias
     );
   }
 
-  return await transferPositionNft(ctx, poolAddrKey, poolAlias, lastNft!);
+  // Transfer NFT and create a new position
+  const newNftId = await transferPositionNft(ctx, poolHash, poolAlias, lastNft!);
+  const newPosition = new DexPosition(poolHash, newNftId, tickUpper, tickLower);
+
+  // Save the new position to the chain
+  await putChainObject(ctx, newPosition);
+
+  return newPosition;
 }
 
 /**
@@ -77,16 +94,16 @@ const LIQUIDITY_TOKEN_CATEGORY = "LiquidityPositions";
  *      all NFTs associated with a specified pool and owner by querying the blockchain ledger.
  *
  * @param ctx GalaChainContext – The execution context that provides access to the GalaChain environment.
- * @param poolAddrKey string – The unique key identifying the NFT pool.
+ * @param poolHash string – The unique key identifying the DEX pool.
  * @param owner string – The address of the owner whose NFTs are being retrieved.
  *
  * @returns Promise<TokenBalance[]> – A promise resolving to the list of NFTs associated with the specified pool and owner.
  */
-async function fetchPositionNfts(ctx: GalaChainContext, poolAddrKey: string, owner: string) {
+async function fetchPositionNfts(ctx: GalaChainContext, poolHash: string, owner: string) {
   return fetchBalances(ctx, {
     collection: LIQUIDITY_TOKEN_COLLECTION,
     category: LIQUIDITY_TOKEN_CATEGORY,
-    type: poolAddrKey,
+    type: poolHash,
     owner
   });
 }
@@ -96,14 +113,14 @@ async function fetchPositionNfts(ctx: GalaChainContext, poolAddrKey: string, own
  *      transfer of a specified NFT instance from one owner to another.
  *
  * @param ctx GalaChainContext – The execution context that provides access to the GalaChain environment.
- * @param poolAddrKey string – The unique key identifying the NFT pool.
+ * @param poolHash string – The unique key identifying the DEX pool.
  * @param from string – The address of the current owner transferring the NFT.
  * @param nft TokenBalance – The NFT token balance containing the instance to be transferred.
  *
  * @returns Promise<string> – A promise resolving to the generated key of the transferred NFT instance.
  */ async function transferPositionNft(
   ctx: GalaChainContext,
-  poolAddrKey: string,
+  poolHash: string,
   from: string,
   nft: TokenBalance
 ): Promise<string> {
@@ -112,7 +129,7 @@ async function fetchPositionNfts(ctx: GalaChainContext, poolAddrKey: string, own
     {
       collection: LIQUIDITY_TOKEN_COLLECTION,
       category: LIQUIDITY_TOKEN_CATEGORY,
-      type: poolAddrKey,
+      type: poolHash,
       additionalKey: nft.additionalKey
     },
     instanceId
@@ -130,7 +147,7 @@ async function fetchPositionNfts(ctx: GalaChainContext, poolAddrKey: string, own
     }
   });
 
-  return genKey(nft.additionalKey, instanceId.toString());
+  return genNftId(nft.additionalKey, instanceId.toString());
 }
 
 /**
@@ -139,7 +156,7 @@ async function fetchPositionNfts(ctx: GalaChainContext, poolAddrKey: string, own
  *
  * @param ctx GalaChainContext – The execution context that provides access to the GalaChain environment.
  * @param batchNumber string – The identifier for the NFT batch being generated.
- * @param poolAddrKey string – The unique key identifying the NFT pool.
+ * @param poolHash string – The unique key identifying the DEX pool.
  * @param poolAlias string – The virtual address associated with the liquidity pool.
  *
  * @returns Promise<void> – A promise that resolves once the NFT batch has been created and minted.
@@ -147,14 +164,14 @@ async function fetchPositionNfts(ctx: GalaChainContext, poolAddrKey: string, own
 export async function generatePositionNftBatch(
   ctx: GalaChainContext,
   batchNumber: string,
-  poolAddrKey: string,
+  poolHash: string,
   poolAlias: string
 ): Promise<void> {
   const holder = poolAlias;
   const tokenClassKey = plainToInstance(TokenClassKey, {
     collection: LIQUIDITY_TOKEN_COLLECTION,
     category: LIQUIDITY_TOKEN_CATEGORY,
-    type: poolAddrKey,
+    type: poolHash,
     additionalKey: batchNumber
   });
 
@@ -169,7 +186,7 @@ export async function generatePositionNftBatch(
   });
 
   const maxNftLimit = nftBatchLimit?.maxSupply ?? new BigNumber(100);
-  const uniqueSymbol = Buffer.from(keccak256.array(poolAddrKey))
+  const uniqueSymbol = Buffer.from(keccak256.array(poolHash))
     .toString("base64")
     .replace(/[^a-zA-Z]/g, "")
     .slice(0, 8);
@@ -179,9 +196,9 @@ export async function generatePositionNftBatch(
     tokenClass: tokenClassKey,
     isNonFungible: true,
     decimals: 0,
-    name: `Dex Liquidity Positions for ${poolAddrKey}`,
+    name: `Dex Liquidity Positions for ${poolHash}`,
     symbol: uniqueSymbol,
-    description: `NFTs representing liquidity positions in the dex pool with Id ${poolAddrKey}`,
+    description: `NFTs representing liquidity positions in the dex pool with Id ${poolHash}`,
     image: "https://static.gala.games/images/icons/units/gala.png",
     maxSupply: maxNftLimit,
     maxCapacity: maxNftLimit,
@@ -206,7 +223,7 @@ export async function generatePositionNftBatch(
 }
 
 /**
- * @dev Function to fetch the NFT ID of a user's liquidity position. The fetchUserPositionNftId
+ * @dev Function to fetch the NFT ID of a user's liquidity position. The fetchUserPositionInTickRange
  *      function retrieves the NFT instance associated with a specific liquidity position in a pool,
  *      based on tick values.
  *
@@ -219,27 +236,23 @@ export async function generatePositionNftBatch(
  *
  * @returns Promise<string | undefined> – The NFT ID if a matching position is found, otherwise undefined.
  */
-export async function fetchUserPositionNftId(
+export async function fetchUserPositionInTickRange(
   ctx: GalaChainContext,
   pool: Pool,
-  tickUpper: string,
-  tickLower: string,
+  tickUpper: number,
+  tickLower: number,
   owner?: string
-): Promise<string | undefined> {
-  const ownerPositions = await fetchPositionNfts(ctx, pool.getPoolAddrKey(), owner ?? ctx.callingUser);
+): Promise<DexPosition | undefined> {
+  const ownerPositions = await fetchPositionNfts(ctx, pool.genPoolHash(), owner ?? ctx.callingUser);
   if (!ownerPositions.length) return undefined;
   for (const nftBatch of ownerPositions) {
     const batchNumber = nftBatch.additionalKey;
 
     for (const instanceId of nftBatch.getNftInstanceIds()) {
-      const nftId = genKey(batchNumber, instanceId.toString());
-
-      if (
-        pool.positions[nftId] &&
-        pool.positions[nftId].tickUpper == tickUpper &&
-        pool.positions[nftId].tickLower == tickLower
-      ) {
-        return nftId; // This will properly return from fetchUserPositionNftId
+      const nftId = genNftId(batchNumber, instanceId.toString());
+      const position = await fetchDexPosition(ctx, pool, nftId);
+      if (position.tickUpper == tickUpper && position.tickLower == tickLower) {
+        return position; // This will properly return from fetchUserPositionInTickRange
       }
     }
   }
@@ -249,7 +262,7 @@ export async function fetchUserPositionNftId(
  * @dev Function to fetch the token instance key of a position NFT.
  *
  * @param ctx GalaChainContext – The execution context that provides access to the GalaChain environment.
- * @param poolAddrKey string – The unique key identifying the NFT pool.
+ * @param poolHash string – The unique key identifying the DEX pool.
  * @param nftId string – The identifier of the NFT instance.
  *
  * @returns Promise<TokenInstanceKey> – A promise resolving to the instance key of the specified NFT.
@@ -257,14 +270,14 @@ export async function fetchUserPositionNftId(
  * @throws NotFoundError – If the specified NFT instance cannot be found.
  */ export async function fetchPositionNftInstanceKey(
   ctx: GalaChainContext,
-  poolAddrKey: string,
+  poolHash: string,
   nftId: string
 ): Promise<TokenInstanceKey> {
   const { instanceId, batchNumber } = parseNftId(nftId);
   const nft = await fetchBalances(ctx, {
     collection: LIQUIDITY_TOKEN_COLLECTION,
     category: LIQUIDITY_TOKEN_CATEGORY,
-    type: poolAddrKey,
+    type: poolHash,
     additionalKey: batchNumber,
     owner: ctx.callingUser
   });

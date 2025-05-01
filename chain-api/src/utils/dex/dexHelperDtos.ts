@@ -25,7 +25,7 @@ export class Bitmap {
 export class PositionData {
   @IsOptional()
   @IsString()
-  poolAddrKey: string;
+  poolHash: string;
 
   @IsOptional()
   @IsString()
@@ -60,8 +60,8 @@ export class PositionData {
   nftId: string;
 }
 
-export class Positions {
-  [key: string]: PositionData;
+export class PositionIndex {
+  [tickRange: string]: string[];
 }
 
 export class TickData {

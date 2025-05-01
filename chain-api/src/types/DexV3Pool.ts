@@ -16,14 +16,12 @@ import BigNumber from "bignumber.js";
 import { Exclude, Type } from "class-transformer";
 import { IsNumber, IsString, ValidateNested } from "class-validator";
 import { JSONSchema } from "class-validator-jsonschema";
+import { keccak256 } from "js-sha3";
 
 import {
   Bitmap,
   ChainKey,
   ConflictError,
-  NotFoundError,
-  PositionData,
-  Positions,
   SlippageToleranceExceededError,
   StepComputations,
   SwapState,
@@ -34,8 +32,6 @@ import {
   computeSwapStep,
   feeAmountTickSpacing,
   flipTick,
-  genKey,
-  genPoolAlias,
   getAmount0Delta,
   getAmount1Delta,
   getFeeGrowthInside,
@@ -47,11 +43,11 @@ import {
   tickCross,
   tickSpacingToMaxLiquidityPerTick,
   tickToSqrtPrice,
-  updatePositions,
   updateTick
 } from "../utils";
 import { BigNumberProperty } from "../validators";
 import { ChainObject } from "./ChainObject";
+import { DexPosition } from "./DexPosition";
 import { TokenClassKey } from "./TokenClass";
 
 @JSONSchema({
@@ -60,16 +56,6 @@ import { TokenClassKey } from "./TokenClass";
 export class Pool extends ChainObject {
   @Exclude()
   static INDEX_KEY = "GCDVP"; //GalaChain Dex V3 Pool
-
-  @JSONSchema({
-    description: "Min Tick for the pool"
-  })
-  public static MIN_TICK = -887272;
-
-  @JSONSchema({
-    description: "Max Tick for the pool"
-  })
-  public static MAX_TICK = 887272;
 
   @ChainKey({ position: 0 })
   @IsString()
@@ -90,10 +76,6 @@ export class Pool extends ChainObject {
   @ValidateNested()
   @Type(() => TokenClassKey)
   public readonly token1ClassKey: TokenClassKey;
-
-  @ValidateNested()
-  @Type(() => PositionData)
-  public positions: Positions;
 
   @ValidateNested()
   @Type(() => Bitmap)
@@ -154,7 +136,6 @@ export class Pool extends ChainObject {
     this.token0ClassKey = token0ClassKey;
     this.token1ClassKey = token1ClassKey;
     this.fee = fee;
-    this.positions = {};
     this.bitmap = {};
     this.tickData = {};
     this.sqrtPrice = initialSqrtPrice;
@@ -174,7 +155,7 @@ export class Pool extends ChainObject {
 
   /**
    * @dev Effect some changes to a position
-   * @param nftId nftId that represents this position
+   * @param position The Dex position that is being updated here
    * @param tickLower lower tick of the position's tick range
    * @param tickUpper upper tick of the position's tick range
    * @param liquidityDelata The amount of liquidity to change in the position
@@ -182,7 +163,7 @@ export class Pool extends ChainObject {
    * @return amount1 the amount of token1 owed to the pool, negative if the pool should pay the recipient
    */
   private _modifyPosition(
-    nftId: string,
+    position: DexPosition,
     tickLower: number,
     tickUpper: number,
     liquidityDelta: BigNumber
@@ -195,7 +176,7 @@ export class Pool extends ChainObject {
     // Common checks for valid tick input
     checkTicks(tickLower, tickUpper);
 
-    this._updatePosition(nftId, tickLower, tickUpper, liquidityDelta, tickCurrent);
+    this._updatePosition(position, tickLower, tickUpper, liquidityDelta, tickCurrent);
 
     //amounts of tokens required to provided given liquidity
     let amount0Req = new BigNumber(0),
@@ -221,14 +202,14 @@ export class Pool extends ChainObject {
 
   /**
    * @dev Gets and updates a position with the given liquidity delta
-   * @param nftId nftId that represents this position
+   * @param position The Dex position that is being updated here
    * @param tickLower the lower tick of the position's tick range
    * @param tickUpper the upper tick of the position's tick range
    * @param tickCurrent the current tick
    */
 
   public _updatePosition(
-    nftId: string,
+    position: DexPosition,
     tickLower: number,
     tickUpper: number,
     liquidityDelta: BigNumber,
@@ -272,31 +253,28 @@ export class Pool extends ChainObject {
       this.feeGrowthGlobal1
     );
 
-    //add new or update position
-    updatePositions(
-      this.positions,
-      nftId,
-      tickLower,
-      tickUpper,
-      liquidityDelta,
-      feeGrowthInside0,
-      feeGrowthInside1
-    );
+    //Update position
+    position.updatePosition(liquidityDelta, feeGrowthInside0, feeGrowthInside1);
   }
 
   /**
    * @notice Adds liquidity for the given recipient/tickLower/tickUpper position
-   * @param recipient The address for which the liquidity will be created
+   * @param position The Dex position that is being updated here
    * @param tickLower The lower tick of the position in which to add liquidity
    * @param tickUpper The upper tick of the position in which to add liquidity
    * @param liquidity The amount of liquidity to mint
    * @return amount0 The amount of token0 that was paid to mint the given amount of liquidity
    * @return amount1 The amount of token1 that was paid to mint the given amount of liquidity
    */
-  public mint(recipient: string, tickLower: number, tickUpper: number, liquidity: BigNumber): BigNumber[] {
+  public mint(
+    position: DexPosition,
+    tickLower: number,
+    tickUpper: number,
+    liquidity: BigNumber
+  ): BigNumber[] {
     if (liquidity.isEqualTo(0)) throw new ValidationFailedError("Invalid Liquidity");
 
-    const [amount0Req, amount1Req] = this._modifyPosition(recipient, tickLower, tickUpper, liquidity);
+    const [amount0Req, amount1Req] = this._modifyPosition(position, tickLower, tickUpper, liquidity);
 
     return [amount0Req, amount1Req];
   }
@@ -375,7 +353,7 @@ export class Pool extends ChainObject {
       );
 
       //cap the tick in valid range i.e. MIN_TICK < tick < MAX_TICK
-      if (step.tickNext < Pool.MIN_TICK || step.tickNext > Pool.MAX_TICK) {
+      if (step.tickNext < DexPosition.MIN_TICK || step.tickNext > DexPosition.MAX_TICK) {
         throw new ConflictError("Not enough liquidity available in pool");
       }
 
@@ -465,19 +443,18 @@ export class Pool extends ChainObject {
    * @notice Burn liquidity from the sender and account tokens owed for the liquidity to the position
    * @dev Can be used to trigger a recalculation of fees owed to a position by calling with an amount of 0
    * @dev Fees must be collected separately via a call to #collect
+   * @param position The Dex position that is being updated here
    * @param tickLower The lower tick of the position for which to burn liquidity
    * @param tickUpper The upper tick of the position for which to burn liquidity
    * @param amount How much liquidity to burn
    * @return amount0 The amount of token0 sent to the recipient
    * @return amount1 The amount of token1 sent to the recipient
    */
-  public burn(nftId: string, tickLower: number, tickUpper: number, amount: BigNumber): BigNumber[] {
-    let [amount0, amount1] = this._modifyPosition(nftId, tickLower, tickUpper, amount.multipliedBy(-1));
+  public burn(position: DexPosition, tickLower: number, tickUpper: number, amount: BigNumber): BigNumber[] {
+    let [amount0, amount1] = this._modifyPosition(position, tickLower, tickUpper, amount.multipliedBy(-1));
 
     amount0 = amount0.abs();
     amount1 = amount1.abs();
-
-    if (this.positions[nftId] == undefined) throw new NotFoundError("Invalid position");
 
     return [amount0, amount1];
   }
@@ -552,7 +529,7 @@ export class Pool extends ChainObject {
   }
   /**
    *
-   * @param recipient this person will get whose accumulated tokens are to be collected
+   * @param position The Dex position that is being updated here
    * @param tickLower The lower tick of the position for which to collect fee accumulated
    * @param tickUpper The upper tick of the position for which to collect fee accumulated
    * @param amount0Requested amount0 The amount of token0 sent to be collected by the recipient
@@ -560,21 +537,20 @@ export class Pool extends ChainObject {
    * @returns
    */
   public collect(
-    nftId: string,
+    position: DexPosition,
     tickLower: number,
     tickUpper: number,
     amount0Requested: BigNumber,
     amount1Requested: BigNumber
   ) {
-    const position = this.positions[nftId];
     if (
       new BigNumber(position.tokensOwed0).lt(amount0Requested) ||
       new BigNumber(position.tokensOwed1).lt(amount1Requested)
     ) {
-      const [tokensOwed0, tokensOwed1] = this.getFeeCollectedEstimation(nftId, tickLower, tickUpper);
+      const [tokensOwed0, tokensOwed1] = this.getFeeCollectedEstimation(position, tickLower, tickUpper);
       if (tokensOwed0.isGreaterThan(0) || tokensOwed1.isGreaterThan(0)) {
-        position.tokensOwed0 = new BigNumber(position.tokensOwed0).plus(tokensOwed0).toString();
-        position.tokensOwed1 = new BigNumber(position.tokensOwed1).plus(tokensOwed1).toString();
+        position.tokensOwed0 = new BigNumber(position.tokensOwed0).plus(tokensOwed0);
+        position.tokensOwed1 = new BigNumber(position.tokensOwed1).plus(tokensOwed1);
       }
     }
     if (
@@ -583,23 +559,22 @@ export class Pool extends ChainObject {
     ) {
       throw new ConflictError("Less balance accumulated");
     }
-    this.positions[nftId].tokensOwed0 = new BigNumber(this.positions[nftId].tokensOwed0)
-      .minus(amount0Requested)
-      .toString();
-    this.positions[nftId].tokensOwed1 = new BigNumber(this.positions[nftId].tokensOwed1)
-      .minus(amount1Requested)
-      .toString();
+    position.tokensOwed0 = new BigNumber(position.tokensOwed0).minus(amount0Requested);
+
+    position.tokensOwed1 = new BigNumber(position.tokensOwed1).minus(amount1Requested);
+
     return [amount0Requested, amount1Requested];
   }
 
   /**
    * @dev it will give Estimation for the tokens collected due swaps
-   * @param recipient this person will get whose accumulated tokens are to be collected
+   * @param position The Dex position that is being updated here
    * @param tickLower The lower tick of the position for which to collect fee accumulated
    * @param tickUpper The upper tick of the position for which to collect fee accumulated
    * @returns
    */
-  public getFeeCollectedEstimation(nftId: string, tickLower: number, tickUpper: number) {
+  public getFeeCollectedEstimation(position: DexPosition, tickLower: number, tickUpper: number) {
+    // Calculate total fees accumulated in given tick range
     const tickCurrent = sqrtPriceToTick(this.sqrtPrice);
     const [feeGrowthInside0, feeGrowthInside1] = getFeeGrowthInside(
       this.tickData,
@@ -610,36 +585,35 @@ export class Pool extends ChainObject {
       this.feeGrowthGlobal1
     );
 
-    const positionData = this.positions[nftId];
-    if (!positionData) throw new NotFoundError("Position not found");
-
-    // Calculate accumulated fees
+    // Calculate fees accumulated for this position
     const tokensOwed0 = feeGrowthInside0
-      .minus(new BigNumber(positionData.feeGrowthInside0Last))
-      .times(new BigNumber(positionData.liquidity));
+      .minus(new BigNumber(position.feeGrowthInside0Last))
+      .times(new BigNumber(position.liquidity));
     const tokensOwed1 = feeGrowthInside1
-      .minus(new BigNumber(positionData.feeGrowthInside1Last))
-      .times(new BigNumber(positionData.liquidity));
+      .minus(new BigNumber(position.feeGrowthInside1Last))
+      .times(new BigNumber(position.liquidity));
 
-    positionData.feeGrowthInside0Last = feeGrowthInside0.toString();
-    positionData.feeGrowthInside1Last = feeGrowthInside1.toString();
+    // Update position to track its last fee collection
+    position.feeGrowthInside0Last = feeGrowthInside0;
+    position.feeGrowthInside1Last = feeGrowthInside1;
 
     return [tokensOwed0, tokensOwed1];
   }
 
   /**
-   * @dev returns unique address key of this pool
-   * @returns poolAddrKey which uniquely identifies this pool
+   * @dev returns a hash that is unique to this pool
+   * @returns poolHash
    */
-  public getPoolAddrKey() {
-    return genKey(this.token0, this.token1, this.fee.toString());
+  public genPoolHash() {
+    const hashingString = [this.token0, this.token1, this.fee].join();
+    return keccak256(hashingString);
   }
 
   /**
    * @dev returns service address which holds the pool's liquidity
-   * @returns poolVirtualAddress
+   * @returns poolAlias
    */
   public getPoolAlias() {
-    return genPoolAlias(this.getPoolAddrKey());
+    return `service|pool_${this.genPoolHash()}`;
   }
 }

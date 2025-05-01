@@ -16,12 +16,15 @@ import BigNumber from "bignumber.js";
 import { Type } from "class-transformer";
 import {
   IsArray,
+  IsBoolean,
+  IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   Max,
   Min,
+  ValidateIf,
   ValidateNested
 } from "class-validator";
 
@@ -29,27 +32,43 @@ import { PositionInPool } from "../utils";
 import {
   BigNumberArrayProperty,
   BigNumberIsInteger,
+  BigNumberIsNegative,
   BigNumberIsPositive,
   BigNumberProperty,
-  IsNonZeroBigNumber
+  EnumProperty,
+  IsBigNumber,
+  IsLessThan,
+  IsNonZeroBigNumber,
+  IsUserAlias
 } from "../validators";
 import { TokenBalance } from "./TokenBalance";
 import { TokenClassKey } from "./TokenClass";
 import { TokenInstanceKey } from "./TokenInstance";
 import { ChainCallDTO } from "./dtos";
 
+const MIN_TICK = -887272,
+  MAX_TICK = 887272;
+
 const f18 = (num: BigNumber, round: BigNumber.RoundingMode = BigNumber.ROUND_DOWN): BigNumber => {
   return new BigNumber(num?.toFixed(18, round) ?? 0);
 };
+
+export enum DexFeePercentageTypes {
+  FEE_0_05_PERCENT = 500, // 0.05%
+  FEE_0_3_PERCENT = 3000, // 0.3%
+  FEE_1_PERCENT = 10000 // 1%
+}
 
 export class CreatePoolDto extends ChainCallDTO {
   @IsNotEmpty()
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
-  @IsNotEmpty()
-  public fee: number;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public initialSqrtPrice: BigNumber;
   @Min(0, { message: "Value cannot less than zero" })
   @Max(1, { message: "Value cannot greater than one" })
@@ -59,7 +78,7 @@ export class CreatePoolDto extends ChainCallDTO {
   constructor(
     token0: TokenClassKey,
     token1: TokenClassKey,
-    fee: number,
+    fee: DexFeePercentageTypes,
     initialSqrtPrice: BigNumber,
     protocolFee = 0
   ) {
@@ -77,22 +96,29 @@ export class PositionDto extends ChainCallDTO {
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
-  @IsNumber()
-  public fee: number;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
   @IsOptional()
   public owner: string;
   @IsNotEmpty()
-  public tickLower: number;
-  @IsNotEmpty()
+  @IsInt()
+  @Max(MAX_TICK)
   public tickUpper: number;
+  @IsNotEmpty()
+  @IsInt()
+  @Min(MIN_TICK)
+  @IsLessThan("tickUpper")
+  public tickLower: number;
   @IsOptional()
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public liquidity: BigNumber;
 
   constructor(
     token0: TokenClassKey,
     token1: TokenClassKey,
-    fee: number,
+    fee: DexFeePercentageTypes,
     owner: string,
     tickLower: number,
     tickUpper: number,
@@ -114,17 +140,19 @@ export class QuoteExactAmountDto extends ChainCallDTO {
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
   @IsNotEmpty()
-  public fee: number;
-  @IsNotEmpty()
+  @IsBoolean()
   public zeroForOne: boolean;
+  @IsBigNumber()
   @BigNumberProperty()
   public amount: BigNumber;
 
   constructor(
     token0: TokenClassKey,
     token1: TokenClassKey,
-    fee: number,
+    fee: DexFeePercentageTypes,
     amount: BigNumber,
     zeroForOne: boolean
   ) {
@@ -142,29 +170,36 @@ export class SwapDto extends ChainCallDTO {
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
   @IsNotEmpty()
-  public fee: number;
-  @IsNotEmpty()
+  @IsBoolean()
   public zeroForOne: boolean;
 
+  @IsBigNumber()
   @BigNumberProperty()
   public sqrtPriceLimit: BigNumber;
 
+  @IsBigNumber()
   @BigNumberProperty()
   public amount: BigNumber;
 
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   @IsOptional()
-  public amountInMaximum: BigNumber;
+  public amountInMaximum?: BigNumber;
 
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsNegative()
   @IsOptional()
-  public amountOutMinimum: BigNumber;
+  public amountOutMinimum?: BigNumber;
 
   constructor(
     token0: TokenClassKey,
     token1: TokenClassKey,
-    fee: number,
+    fee: DexFeePercentageTypes,
     amount: BigNumber,
     zeroForOne: boolean,
     sqrtPriceLimit: BigNumber
@@ -181,28 +216,44 @@ export class SwapDto extends ChainCallDTO {
 
 export class BurnDto extends ChainCallDTO {
   @IsNotEmpty()
-  public tickLower: number;
-  @IsNotEmpty()
+  @IsInt()
+  @Max(MAX_TICK)
   public tickUpper: number;
+  @IsNotEmpty()
+  @IsInt()
+  @Min(MIN_TICK)
+  @IsLessThan("tickUpper")
+  public tickLower: number;
   @IsNotEmpty()
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
-  @IsNotEmpty()
-  public fee: number;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public amount: BigNumber;
-  @IsNotEmpty()
-  public owner: string;
+  @BigNumberProperty()
+  @BigNumberIsPositive()
+  public amount0Min: BigNumber;
+  @BigNumberProperty()
+  @BigNumberIsPositive()
+  public amount1Min: BigNumber;
+  @ValidateIf((e) => e.owner !== undefined)
+  @IsUserAlias()
+  public owner?: string;
 
   constructor(
     token0: TokenClassKey,
     token1: TokenClassKey,
-    fee: number,
+    fee: DexFeePercentageTypes,
     amount: BigNumber,
     tickLower: number,
     tickUpper: number,
-    owner: string
+    amount0Min: BigNumber,
+    amount1Min: BigNumber,
+    owner?: string
   ) {
     super();
     this.tickLower = tickLower;
@@ -211,6 +262,8 @@ export class BurnDto extends ChainCallDTO {
     this.token0 = token0;
     this.token1 = token1;
     this.fee = fee;
+    this.amount0Min = amount0Min;
+    this.amount1Min = amount1Min;
     this.owner = owner;
   }
 }
@@ -220,8 +273,8 @@ export class GetPoolDto extends ChainCallDTO {
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
-  @IsNotEmpty()
-  public fee: number;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
 
   constructor(token0: TokenClassKey, token1: TokenClassKey, fee: number) {
     super();
@@ -232,11 +285,16 @@ export class GetPoolDto extends ChainCallDTO {
 }
 
 export class Slot0ResDto extends ChainCallDTO {
+  @IsBigNumber()
   @BigNumberProperty()
   public sqrtPrice: BigNumber;
   @IsNotEmpty()
+  @IsNumber()
+  @IsInt()
   public tick: number;
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public liquidity: BigNumber;
 
   constructor(sqrtPrice: BigNumber, tick: number, liquidity: BigNumber) {
@@ -257,56 +315,54 @@ export class GetPositionDto extends ChainCallDTO {
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
   @IsNotEmpty()
-  public fee: number;
-  @IsNotEmpty()
-  public owner: string;
-  @IsNotEmpty()
-  public tickLower: number;
-  @IsNotEmpty()
+  @IsInt()
+  @Max(MAX_TICK)
   public tickUpper: number;
+  @IsNotEmpty()
+  @IsInt()
+  @Min(MIN_TICK)
+  @IsLessThan("tickUpper")
+  public tickLower: number;
+  @IsOptional()
+  @IsString()
+  public owner?: string;
 
   constructor(
     token0: TokenClassKey,
     token1: TokenClassKey,
-    fee: number,
-    owner: string,
+    fee: DexFeePercentageTypes,
     tickLower: number,
-    tickUpper: number
+    tickUpper: number,
+    owner?: string
   ) {
     super();
     this.token0 = token0;
     this.token1 = token1;
     this.fee = fee;
-    this.owner = owner;
     this.tickLower = tickLower;
     this.tickUpper = tickUpper;
+    this.owner = owner;
   }
 }
 
-export class GetPositionWithNftIdDto extends ChainCallDTO {
-  @IsNotEmpty()
-  @ValidateNested()
-  @Type(() => TokenClassKey)
-  public token0: TokenClassKey;
-  @IsNotEmpty()
-  @ValidateNested()
-  @Type(() => TokenClassKey)
-  public token1: TokenClassKey;
-  @IsNotEmpty()
-  @IsNumber()
-  public fee: number;
-  @IsNotEmpty()
+export class positionInfoDto {
   @IsString()
-  public nftId: string;
-
-  constructor(token0: TokenClassKey, token1: TokenClassKey, fee: number, nftId: string) {
-    super();
-    this.token0 = token0;
-    this.token1 = token1;
-    this.fee = fee;
-    this.nftId = nftId;
-  }
+  public owner: string;
+  @IsString()
+  public liquidity: string;
+  @IsString()
+  public feeGrowthInside0Last: string;
+  @IsString()
+  public feeGrowthInside1Last: string;
+  @IsString()
+  // fees owed to the position owner in token0/token1
+  @IsString()
+  public tokensOwed0: string;
+  @IsString()
+  public tokensOwed1: string;
 }
 
 export class GetUserPositionsDto extends ChainCallDTO {
@@ -335,60 +391,51 @@ export class UserPositionDTO extends ChainCallDTO {
 }
 
 export class GetPositionResDto {
-  @IsOptional()
-  @IsString()
-  poolAddrKey: string;
-
-  @IsOptional()
-  @IsString()
-  tickUpper: string;
-
-  @IsOptional()
-  @IsString()
-  tickLower: string;
-
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
   liquidity: string;
-
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
   feeGrowthInside0Last: string;
-
-  @IsOptional()
   @IsString()
+  @IsNotEmpty()
   feeGrowthInside1Last: string;
-
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
   tokensOwed0: string;
-
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
   tokensOwed1: string;
 }
 
 export class GetAddLiquidityEstimationDto extends ChainCallDTO {
+  @IsBigNumber()
   @BigNumberProperty()
   public amount: BigNumber;
   @IsNotEmpty()
-  public tickLower: number;
-  @IsNotEmpty()
+  @IsInt()
+  @Max(MAX_TICK)
   public tickUpper: number;
   @IsNotEmpty()
+  @IsInt()
+  @Min(MIN_TICK)
+  @IsLessThan("tickUpper")
+  public tickLower: number;
+  @IsNotEmpty()
+  @IsBoolean()
   public zeroForOne: boolean;
 
   @IsNotEmpty()
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
-  @IsNotEmpty()
-  public fee: number;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
 
   constructor(
     token0: TokenClassKey,
     token1: TokenClassKey,
-    fee: number,
+    fee: DexFeePercentageTypes,
     amount: BigNumber,
     tickLower: number,
     tickUpper: number,
@@ -423,21 +470,30 @@ export class CollectDto extends ChainCallDTO {
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
-  @IsNotEmpty()
-  public fee: number;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public amount0Requested: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public amount1Requested: BigNumber;
   @IsNotEmpty()
-  public tickLower: number;
-  @IsNotEmpty()
+  @IsInt()
+  @Max(MAX_TICK)
   public tickUpper: number;
+  @IsNotEmpty()
+  @IsInt()
+  @Min(MIN_TICK)
+  @IsLessThan("tickUpper")
+  public tickLower: number;
 
   constructor(
     token0: TokenClassKey,
     token1: TokenClassKey,
-    fee: number,
+    fee: DexFeePercentageTypes,
     amount0Requested: BigNumber,
     amount1Requested: BigNumber,
     tickLower: number,
@@ -462,23 +518,36 @@ export class AddLiquidityDTO extends ChainCallDTO {
   @IsNotEmpty()
   public readonly fee: number;
   @IsNotEmpty()
-  public readonly tickLower: number;
-  @IsNotEmpty()
+  @IsInt()
+  @Max(MAX_TICK)
   public readonly tickUpper: number;
+  @IsNotEmpty()
+  @IsInt()
+  @Min(MIN_TICK)
+  @IsLessThan("tickUpper")
+  public readonly tickLower: number;
 
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public amount0Desired: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public amount1Desired: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public amount0Min: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public amount1Min: BigNumber;
 
   constructor(
     token0: TokenClassKey,
     token1: TokenClassKey,
-    fee: number,
+    fee: DexFeePercentageTypes,
     tickLower: number,
     tickUpper: number,
     amount0Desired: BigNumber,
@@ -571,13 +640,13 @@ export class CollectTradingFeesDto extends ChainCallDTO {
   public token0: TokenClassKey;
   @IsNotEmpty()
   public token1: TokenClassKey;
-  @IsNotEmpty()
-  public fee: number;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
   @IsString()
   @IsNotEmpty()
   public recepient: string;
 
-  constructor(token0: TokenClassKey, token1: TokenClassKey, fee: number, recepient: string) {
+  constructor(token0: TokenClassKey, token1: TokenClassKey, fee: DexFeePercentageTypes, recepient: string) {
     super();
     this.token0 = token0;
     this.token1 = token1;
@@ -597,13 +666,9 @@ export class SetProtocolFeeDto extends ChainCallDTO {
 }
 
 export interface IPosition {
-  tickUpper: string;
-  tickLower: string;
+  tickLower: number;
+  tickUpper: number;
   liquidity: string;
-  feeGrowthInside0Last: string;
-  feeGrowthInside1Last: string;
-  tokensOwed0: string;
-  tokensOwed1: string;
   token0Img?: string;
   token1Img?: string;
   token0InstanceKey?: TokenInstanceKey & {
@@ -625,7 +690,9 @@ export interface IPosition {
 }
 
 export class GetLiquidityResDto extends ChainCallDTO {
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public liquidity: BigNumber;
   constructor(liquidity: BigNumber) {
     super();
@@ -634,11 +701,15 @@ export class GetLiquidityResDto extends ChainCallDTO {
 }
 
 export class GetAddLiquidityEstimationResDto extends ChainCallDTO {
+  @IsBigNumber()
   @BigNumberProperty()
   public amount0: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
   public amount1: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
+  @BigNumberIsPositive()
   public liquidity: BigNumber;
   constructor(amount0: BigNumber, amount1: BigNumber, liquidity: BigNumber) {
     super();
@@ -649,12 +720,16 @@ export class GetAddLiquidityEstimationResDto extends ChainCallDTO {
 }
 
 export class QuoteExactAmountResDto extends ChainCallDTO {
+  @IsBigNumber()
   @BigNumberProperty()
   public amount0: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
   public amount1: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
   public currentSqrtPrice: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
   public newSqrtPrice: BigNumber;
   constructor(amount0: BigNumber, amount1: BigNumber, currentSqrtPrice: BigNumber, newSqrtPrice: BigNumber) {
@@ -667,8 +742,10 @@ export class QuoteExactAmountResDto extends ChainCallDTO {
 }
 
 export class GetRemoveLiqEstimationResDto extends ChainCallDTO {
+  @IsBigNumber()
   @BigNumberProperty()
   public amount0: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
   public amount1: BigNumber;
   constructor(amount0: BigNumber, amount1: BigNumber) {
@@ -679,8 +756,10 @@ export class GetRemoveLiqEstimationResDto extends ChainCallDTO {
 }
 
 export class CollectTradingFeesResDto extends ChainCallDTO {
+  @IsBigNumber()
   @BigNumberProperty()
   public protocolFeesToken0: BigNumber;
+  @IsBigNumber()
   @BigNumberProperty()
   public protocolFeesToken1: BigNumber;
   constructor(protocolFeesToken0: BigNumber, protocolFeesToken1: BigNumber) {
@@ -708,6 +787,77 @@ export class ConfigureDexFeeAddressDto extends ChainCallDTO {
   @IsArray()
   @IsString({ each: true })
   public newAuthorities?: string[];
+}
+
+export class BurnEstimateDto extends ChainCallDTO {
+  @IsNotEmpty()
+  @IsInt()
+  @Max(MAX_TICK)
+  public tickUpper: number;
+  @IsNotEmpty()
+  @IsInt()
+  @Min(MIN_TICK)
+  @IsLessThan("tickUpper")
+  public tickLower: number;
+  @IsNotEmpty()
+  public token0: TokenClassKey;
+  @IsNotEmpty()
+  public token1: TokenClassKey;
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
+  @IsBigNumber()
+  @BigNumberProperty()
+  @BigNumberIsPositive()
+  public amount: BigNumber;
+  @IsOptional()
+  public owner: string | null;
+
+  constructor(
+    token0: TokenClassKey,
+    token1: TokenClassKey,
+    fee: DexFeePercentageTypes,
+    amount: BigNumber,
+    tickLower: number,
+    tickUpper: number,
+    owner: string
+  ) {
+    super();
+    this.tickLower = tickLower;
+    this.tickUpper = tickUpper;
+    this.amount = amount;
+    this.token0 = token0;
+    this.token1 = token1;
+    this.fee = fee;
+    this.owner = owner;
+  }
+}
+
+export class GetPositionWithNftIdDto extends ChainCallDTO {
+  @IsNotEmpty()
+  @ValidateNested()
+  @Type(() => TokenClassKey)
+  public token0: TokenClassKey;
+
+  @IsNotEmpty()
+  @ValidateNested()
+  @Type(() => TokenClassKey)
+  public token1: TokenClassKey;
+
+  @IsNotEmpty()
+  @IsNumber()
+  public fee: number;
+
+  @IsNotEmpty()
+  @IsString()
+  public nftId: string;
+
+  constructor(token0: TokenClassKey, token1: TokenClassKey, fee: number, nftId: string) {
+    super();
+    this.token0 = token0;
+    this.token1 = token1;
+    this.fee = fee;
+    this.nftId = nftId;
+  }
 }
 
 export class DexNftBatchLimitDto extends ChainCallDTO {

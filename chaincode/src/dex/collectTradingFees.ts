@@ -29,11 +29,9 @@ import { GalaChainContext } from "../types";
 import {
   convertToTokenInstanceKey,
   fetchDexProtocolFeeConfig,
-  genKey,
   getObjectByKey,
   putChainObject,
   validateTokenOrder,
-  virtualAddress
 } from "../utils";
 
 /**
@@ -63,8 +61,7 @@ export async function collectTradingFees(
 
   //If pool does not exist
   if (pool == undefined) throw new ConflictError("Pool does not exist");
-  const poolAddrKey = genKey(pool.token0, pool.token1, pool.fee.toString());
-  const poolVirtualAddress = virtualAddress(poolAddrKey);
+  const poolAlias = pool.getPoolAlias();
 
   const amounts = pool.collectTradingFees();
 
@@ -78,7 +75,7 @@ export async function collectTradingFees(
     if (amount.gt(0)) {
       const poolTokenBalance = await fetchOrCreateBalance(
         ctx,
-        poolVirtualAddress,
+        poolAlias,
         tokenInstanceKeys[index].getTokenClassKey()
       );
       const roundedAmount = BigNumber.min(
@@ -87,14 +84,14 @@ export async function collectTradingFees(
       );
 
       await transferToken(ctx, {
-        from: poolVirtualAddress,
+        from: poolAlias,
         to: dto.recepient,
         tokenInstanceKey: tokenInstanceKeys[index],
         quantity: roundedAmount,
         allowancesToUse: [],
         authorizedOnBehalf: {
-          callingOnBehalf: poolVirtualAddress,
-          callingUser: poolVirtualAddress
+          callingOnBehalf: poolAlias,
+          callingUser: poolAlias
         }
       });
     }

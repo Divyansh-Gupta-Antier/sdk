@@ -1,0 +1,138 @@
+/*
+ * Copyright (c) Gala Games Inc. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import BigNumber from "bignumber.js";
+import { Exclude, Type } from "class-transformer";
+import { IsNotEmpty, IsNumber, IsString, Max, Min } from "class-validator";
+import { JSONSchema } from "class-validator-jsonschema";
+
+import { ChainKey, ConflictError, requirePosititve } from "../utils";
+import { BigNumberIsNotNegative, BigNumberProperty, IsLessThan } from "../validators";
+import { ChainObject } from "./ChainObject";
+
+@JSONSchema({
+  description:
+    `Represents a liquidity position in a decentralized exchange (DEX) pool.` +
+    `Each position is associated with a unique NFT and defined by tick boundaries, liquidity amount, and fee tracking information.`
+})
+export class DexPosition extends ChainObject {
+  @Exclude()
+  static INDEX_KEY = "GCDP"; //GalaChain Dex Position
+
+  @JSONSchema({
+    description: "Minimum tick value allowed for the pool"
+  })
+  public static MIN_TICK = -887272;
+
+  @JSONSchema({
+    description: "Maximum tick value allowed for the pool"
+  })
+  public static MAX_TICK = 887272;
+
+  @ChainKey({ position: 0 })
+  @IsNotEmpty()
+  @IsString()
+  poolHash: string;
+
+  @ChainKey({ position: 1 })
+  @IsNotEmpty()
+  @IsString()
+  nftId: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Max(DexPosition.MAX_TICK)
+  tickUpper: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(DexPosition.MIN_TICK)
+  @IsLessThan("tickUpper")
+  tickLower: number;
+
+  @BigNumberIsNotNegative()
+  @BigNumberProperty()
+  liquidity: BigNumber;
+
+  @BigNumberIsNotNegative()
+  @BigNumberProperty()
+  feeGrowthInside0Last: BigNumber;
+
+  @BigNumberIsNotNegative()
+  @BigNumberProperty()
+  feeGrowthInside1Last: BigNumber;
+
+  @BigNumberIsNotNegative()
+  @BigNumberProperty()
+  tokensOwed0: BigNumber;
+
+  @BigNumberIsNotNegative()
+  @BigNumberProperty()
+  tokensOwed1: BigNumber;
+
+  /**
+   * Initializes a new instance of the pool position.
+   *
+   * @param poolHash - Unique identifier for the pool.
+   * @param nftId - Identifier for the NFT representing the position.
+   * @param tickUpper - Upper tick boundary for the position.
+   * @param tickLower - Lower tick boundary for the position.
+   */
+  constructor(poolHash: string, nftId: string, tickUpper: number, tickLower: number) {
+    super();
+    this.poolHash = poolHash;
+    this.nftId = nftId;
+    this.tickUpper = tickUpper;
+    this.tickLower = tickLower;
+    this.liquidity = new BigNumber(0);
+    this.feeGrowthInside0Last = new BigNumber(0);
+    this.feeGrowthInside1Last = new BigNumber(0);
+    this.tokensOwed0 = new BigNumber(0);
+    this.tokensOwed1 = new BigNumber(0);
+  }
+
+  /**
+   * Updates the position's liquidity and fee tracking data.
+   *
+   * @param liquidityDelta - Change in liquidity (can be positive or negative).
+   * @param feeGrowthInside0 - Latest accumulated fee growth for token0 within the tick range.
+   * @param feeGrowthInside1 - Latest accumulated fee growth for token1 within the tick range.
+   */
+
+  public updatePosition(liquidityDelta: BigNumber, feeGrowthInside0: BigNumber, feeGrowthInside1: BigNumber) {
+    // Calculate and validate change in liquidity
+    let liquidityNext: BigNumber;
+    if (liquidityDelta.isEqualTo(0)) {
+      if (!this.liquidity.isGreaterThan(0)) throw new ConflictError("NP");
+      liquidityNext = this.liquidity;
+    } else {
+      liquidityNext = this.liquidity.plus(liquidityDelta);
+      requirePosititve(liquidityNext);
+    }
+
+    // Calculate accumulated fees
+    const tokensOwed0 = feeGrowthInside0.minus(this.feeGrowthInside0Last).times(this.liquidity);
+    const tokensOwed1 = feeGrowthInside1.minus(this.feeGrowthInside1Last).times(this.liquidity);
+
+    // Update the position
+    if (!liquidityDelta.isEqualTo(0)) this.liquidity = liquidityNext;
+    this.feeGrowthInside0Last = feeGrowthInside0;
+    this.feeGrowthInside1Last = feeGrowthInside1;
+
+    if (tokensOwed0.isGreaterThan(0) || tokensOwed1.isGreaterThan(0)) {
+      this.tokensOwed0 = this.tokensOwed0.plus(tokensOwed0);
+      this.tokensOwed1 = this.tokensOwed1.plus(tokensOwed1);
+    }
+  }
+}

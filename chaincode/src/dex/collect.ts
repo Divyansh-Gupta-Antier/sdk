@@ -27,8 +27,14 @@ import { burnTokens } from "../burns";
 import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
-import { convertToTokenInstanceKey, getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
-import { fetchPositionNftInstanceKey, fetchUserPositionNftId } from "./positionNft";
+import {
+  convertToTokenInstanceKey,
+  deleteChainObject,
+  getObjectByKey,
+  putChainObject,
+  validateTokenOrder
+} from "../utils";
+import { fetchPositionNftInstanceKey, fetchUserPositionInTickRange } from "./positionNft";
 
 /**
  * @dev The collect function allows a user to claim and withdraw accrued fee tokens from a specific liquidity position in a Uniswap V3 pool within the GalaChain ecosystem. It retrieves earned fees based on the user's position details and transfers them to the user's account.
@@ -46,38 +52,31 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
   //If pool does not exist
   if (pool == undefined) throw new ConflictError("Pool does not exist");
 
-  const poolAddrKey = pool.getPoolAddrKey();
-  const poolVirtualAddress = pool.getPoolAlias();
-  const positionNftId = await fetchUserPositionNftId(
-    ctx,
-    pool,
-    dto.tickUpper.toString(),
-    dto.tickLower.toString()
-  );
-  if (!positionNftId)
-    throw new NotFoundError(`User doesn't hold any positions with this tick range in this pool`);
+  const poolHash = pool.genPoolHash();
+  const poolAlias = pool.getPoolAlias();
+  const position = await fetchUserPositionInTickRange(ctx, pool, dto.tickUpper, dto.tickLower);
+  if (!position) throw new NotFoundError(`User doesn't hold any positions with this tick range in this pool`);
 
   const tickLower = parseInt(dto.tickLower.toString()),
     tickUpper = parseInt(dto.tickUpper.toString());
 
-  const amounts = pool.collect(positionNftId, tickLower, tickUpper, amount0Requested, amount1Requested);
+  const amounts = pool.collect(position, tickLower, tickUpper, amount0Requested, amount1Requested);
 
-  const position = pool.positions[positionNftId];
   const deleteUserPos =
     new BigNumber(position.tokensOwed0).f18().isZero() &&
     new BigNumber(position.tokensOwed1).f18().isZero() &&
     new BigNumber(position.liquidity).f18().isZero();
 
   if (deleteUserPos) {
-    delete pool.positions[positionNftId];
     const burnTokenQuantity = new BurnTokenQuantity();
-    burnTokenQuantity.tokenInstanceKey = await fetchPositionNftInstanceKey(ctx, poolAddrKey, positionNftId);
+    burnTokenQuantity.tokenInstanceKey = await fetchPositionNftInstanceKey(ctx, poolHash, position.nftId);
     burnTokenQuantity.quantity = new BigNumber(1);
     await burnTokens(ctx, {
       owner: ctx.callingUser,
       toBurn: [burnTokenQuantity],
       preValidated: true
     });
+    await deleteChainObject(ctx, position);
   }
   await putChainObject(ctx, pool);
 
@@ -91,7 +90,7 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
     if (amount.gt(0)) {
       const poolTokenBalance = await fetchOrCreateBalance(
         ctx,
-        poolVirtualAddress,
+        poolAlias,
         tokenInstanceKeys[index].getTokenClassKey()
       );
       const roundedAmount = BigNumber.min(
@@ -100,14 +99,14 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
       );
 
       await transferToken(ctx, {
-        from: poolVirtualAddress,
+        from: poolAlias,
         to: ctx.callingUser,
         tokenInstanceKey: tokenInstanceKeys[index],
         quantity: roundedAmount,
         allowancesToUse: [],
         authorizedOnBehalf: {
-          callingOnBehalf: poolVirtualAddress,
-          callingUser: poolVirtualAddress
+          callingOnBehalf: poolAlias,
+          callingUser: poolAlias
         }
       });
     }

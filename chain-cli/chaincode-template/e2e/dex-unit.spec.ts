@@ -43,7 +43,7 @@ import {
   tickToSqrtPrice,
   updateTick
 } from "@gala-chain/api";
-import { genKey, validateTokenOrder } from "@gala-chain/chaincode";
+import { genNftId, validateTokenOrder } from "@gala-chain/chaincode";
 import BigNumber from "bignumber.js";
 
 import TOKENS from "./tokens";
@@ -246,9 +246,9 @@ describe("validateTokenOrder", () => {
     expect(() => validateTokenOrder(USDC_ClassKey, ETH_ClassKey)).toThrow("Token0 must be smaller");
   });
 });
-describe("genKey", () => {
+describe("genNftId", () => {
   test("should concatenate parameters with '_'", () => {
-    expect(genKey("1", "2", "3", "4")).toBe("1$2$3$4");
+    expect(genNftId("1", "2", "3", "4")).toBe("1$2$3$4");
   });
 });
 

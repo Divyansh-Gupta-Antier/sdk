@@ -21,11 +21,9 @@ import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
 import {
   convertToTokenInstanceKey,
-  genKey,
   getObjectByKey,
   putChainObject,
   validateTokenOrder,
-  virtualAddress
 } from "../utils";
 
 /**
@@ -54,8 +52,7 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
   if (pool == undefined) throw new ConflictError("Pool does not exist");
 
   const amounts = pool.swap(zeroForOne, dto.amount, sqrtPriceLimit);
-  const poolAddrKey = genKey(pool.token0, pool.token1, pool.fee.toString());
-  const poolVirtualAddress = virtualAddress(poolAddrKey);
+  const poolAlias = pool.getPoolAlias();
 
   //create tokenInstanceKeys
   const tokenInstanceKeys = [pool.token0ClassKey, pool.token1ClassKey].map(convertToTokenInstanceKey);
@@ -71,7 +68,7 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
 
       await transferToken(ctx, {
         from: ctx.callingUser,
-        to: poolVirtualAddress,
+        to: poolAlias,
         tokenInstanceKey: tokenInstanceKeys[index],
         quantity: new BigNumber(amount.toFixed(tokenClasses[index].decimals)),
         allowancesToUse: [],
@@ -85,7 +82,7 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
 
       const poolTokenBalance = await fetchOrCreateBalance(
         ctx,
-        poolVirtualAddress,
+        poolAlias,
         tokenInstanceKeys[index].getTokenClassKey()
       );
       const roundedAmount = BigNumber.min(
@@ -93,14 +90,14 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
         poolTokenBalance.getQuantityTotal()
       );
       await transferToken(ctx, {
-        from: poolVirtualAddress,
+        from: poolAlias,
         to: ctx.callingUser,
         tokenInstanceKey: tokenInstanceKeys[index],
         quantity: roundedAmount,
         allowancesToUse: [],
         authorizedOnBehalf: {
-          callingOnBehalf: poolVirtualAddress,
-          callingUser: poolVirtualAddress
+          callingOnBehalf: poolAlias,
+          callingUser: poolAlias
         }
       });
     }

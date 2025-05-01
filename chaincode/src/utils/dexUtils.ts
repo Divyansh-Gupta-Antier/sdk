@@ -15,7 +15,9 @@
 import {
   ChainError,
   DexFeeConfig,
+  DexPosition,
   ErrorCode,
+  Pool,
   TokenClassKey,
   TokenInstanceKey,
   ValidationFailedError
@@ -47,14 +49,6 @@ export const swapAmounts = (arr: string[] | BigNumber[], idx = 0, idx2 = 1) => {
   const temp = arr[idx];
   arr[idx] = arr[idx2];
   arr[idx2] = temp;
-};
-/**
- *
- * @param address address of pool in string
- * @returns
- */
-export const virtualAddress = (address: string) => {
-  return "service|" + address;
 };
 
 /**
@@ -95,8 +89,8 @@ export function validateTokenOrder(token0: TokenClassKey, token1: TokenClassKey)
   return [normalizedToken0, normalizedToken1];
 }
 
-export function genKey(...params: string[] | number[]): string {
-  return params.join("$").replace(/\|/g, ":");
+export function genNftId(...params: string[] | number[]): string {
+  return params.join("$");
 }
 
 export function genBookMark(...params: string[] | number[]): string {
@@ -139,4 +133,28 @@ export async function fetchDexProtocolFeeConfig(ctx: GalaChainContext): Promise<
   });
 
   return dexConfig;
+}
+
+/**
+ * Fetches the DexPosition for a given pool and NFT ID.
+ *
+ * @param ctx - The GalaChain context used to access the blockchain state.
+ * @param pool - The pool object used to generate the pool hash.
+ * @param nftId - The NFT ID used to identify the position.
+ * @param throwIfNotFound - Optional flag; if true, throws an error when the position is not found.
+ * @returns A DexPosition object if found, or undefined if not found (unless throwIfNotFound is true).
+ */
+export async function fetchDexPosition(
+  ctx: GalaChainContext,
+  pool: Pool,
+  nftId: string
+): Promise<DexPosition> {
+  const poolHash = pool.genPoolHash();
+  const position = await getObjectByKey(
+    ctx,
+    DexPosition,
+    ctx.stub.createCompositeKey(DexPosition.INDEX_KEY, [poolHash, nftId])
+  );
+
+  return position;
 }
