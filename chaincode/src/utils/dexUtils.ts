@@ -15,7 +15,7 @@
 import {
   ChainError,
   DexFeeConfig,
-  DexPosition,
+  DexPositionData,
   ErrorCode,
   Pool,
   TokenClassKey,
@@ -136,24 +136,24 @@ export async function fetchDexProtocolFeeConfig(ctx: GalaChainContext): Promise<
 }
 
 /**
- * Fetches the DexPosition for a given pool and NFT ID.
+ * Fetches the DexPositionData for a given pool and NFT ID.
  *
  * @param ctx - The GalaChain context used to access the blockchain state.
  * @param pool - The pool object used to generate the pool hash.
  * @param nftId - The NFT ID used to identify the position.
  * @param throwIfNotFound - Optional flag; if true, throws an error when the position is not found.
- * @returns A DexPosition object if found, or undefined if not found (unless throwIfNotFound is true).
+ * @returns A DexPositionData object if found, or undefined if not found (unless throwIfNotFound is true).
  */
 export async function fetchDexPosition(
   ctx: GalaChainContext,
   pool: Pool,
   nftId: string
-): Promise<DexPosition> {
+): Promise<DexPositionData> {
   const poolHash = pool.genPoolHash();
   const position = await getObjectByKey(
     ctx,
-    DexPosition,
-    ctx.stub.createCompositeKey(DexPosition.INDEX_KEY, [poolHash, nftId])
+    DexPositionData,
+    ctx.stub.createCompositeKey(DexPositionData.INDEX_KEY, [poolHash, nftId])
   );
 
   return position;

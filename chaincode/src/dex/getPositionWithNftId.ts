@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { DexPosition, GetPositionWithNftIdDto, NotFoundError, getFeeGrowthInside, sqrtPriceToTick } from "@gala-chain/api";
+import { DexPositionData, GetPositionWithNftIdDto, NotFoundError, getFeeGrowthInside, sqrtPriceToTick } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { GalaChainContext } from "../types";
@@ -25,12 +25,12 @@ import { getPoolData } from "./getFunctions";
  * @param dto GetPositionDto - A data transfer object containing:
  - Pool identifiers – Class keys or token details required to identify the pool.
  - NFT identifier - unique NFT that identifies a position in a pool
- * @returns DexPosition
+ * @returns DexPositionData
  */
 export async function getPositionWithNftId(
   ctx: GalaChainContext,
   dto: GetPositionWithNftIdDto
-): Promise<DexPosition> {
+): Promise<DexPositionData> {
   // Fetch pool data based on input
   const pool = await getPoolData(ctx, dto);
   if (!pool) throw new NotFoundError("No pool for these tokens and fee exists");

@@ -14,7 +14,7 @@
  */
 import {
   ChainError,
-  DexPosition,
+  DexPositionData,
   ErrorCode,
   MintTokenDto,
   NotFoundError,
@@ -42,7 +42,7 @@ const LIQUIDITY_TOKEN_CATEGORY = "LiquidityPositions";
  * @dev Assigns a new position NFT within a specified pool. This function ensures that there are
  *      available NFTs for assignment. If no NFTs are present, it generates a new batch. If the last
  *      available NFT has only one instance remaining, a new batch is also created to prevent exhaustion.
- *      After assignment, it creates and stores a new DexPosition associated with the assigned NFT.
+ *      After assignment, it creates and stores a new DexPositionData associated with the assigned NFT.
  *
  * @param ctx GalaChainContext – The execution context for the GalaChain environment.
  * @param poolHash string – The unique identifier for the DEX pool.
@@ -50,7 +50,7 @@ const LIQUIDITY_TOKEN_CATEGORY = "LiquidityPositions";
  * @param tickUpper number – The upper tick boundary for the new position.
  * @param tickLower number – The lower tick boundary for the new position.
  *
- * @returns DexPosition – The newly created DexPosition object associated with the assigned NFT.
+ * @returns DexPositionData – The newly created DexPositionData object associated with the assigned NFT.
  */
 export async function createPosition(
   ctx: GalaChainContext,
@@ -58,7 +58,7 @@ export async function createPosition(
   poolAlias: string,
   tickUpper: number,
   tickLower: number
-): Promise<DexPosition> {
+): Promise<DexPositionData> {
   // Fetch existing NFTs for the given pool
   let nfts = await fetchPositionNfts(ctx, poolHash, poolAlias);
   let lastNft = nfts.at(-1);
@@ -81,7 +81,7 @@ export async function createPosition(
 
   // Transfer NFT and create a new position
   const newNftId = await transferPositionNft(ctx, poolHash, poolAlias, lastNft!);
-  const newPosition = new DexPosition(poolHash, newNftId, tickUpper, tickLower);
+  const newPosition = new DexPositionData(poolHash, newNftId, tickUpper, tickLower);
 
   // Save the new position to the chain
   await putChainObject(ctx, newPosition);
@@ -242,7 +242,7 @@ export async function fetchUserPositionInTickRange(
   tickUpper: number,
   tickLower: number,
   owner?: string
-): Promise<DexPosition | undefined> {
+): Promise<DexPositionData | undefined> {
   const ownerPositions = await fetchPositionNfts(ctx, pool.genPoolHash(), owner ?? ctx.callingUser);
   if (!ownerPositions.length) return undefined;
   for (const nftBatch of ownerPositions) {

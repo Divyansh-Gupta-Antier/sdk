@@ -26,7 +26,7 @@ import { ChainObject } from "./ChainObject";
     `Represents a liquidity position in a decentralized exchange (DEX) pool.` +
     `Each position is associated with a unique NFT and defined by tick boundaries, liquidity amount, and fee tracking information.`
 })
-export class DexPosition extends ChainObject {
+export class DexPositionData extends ChainObject {
   @Exclude()
   static INDEX_KEY = "GCDP"; //GalaChain Dex Position
 
@@ -46,20 +46,22 @@ export class DexPosition extends ChainObject {
   poolHash: string;
 
   @ChainKey({ position: 1 })
-  @IsNotEmpty()
-  @IsString()
-  nftId: string;
-
   @Type(() => Number)
   @IsNumber()
-  @Max(DexPosition.MAX_TICK)
+  @Max(DexPositionData.MAX_TICK)
   tickUpper: number;
 
+  @ChainKey({ position: 2 })
   @Type(() => Number)
   @IsNumber()
-  @Min(DexPosition.MIN_TICK)
+  @Min(DexPositionData.MIN_TICK)
   @IsLessThan("tickUpper")
   tickLower: number;
+
+  @ChainKey({ position: 4 })
+  @IsNotEmpty()
+  @IsString()
+  positionId: string;
 
   @BigNumberIsNotNegative()
   @BigNumberProperty()
@@ -89,10 +91,10 @@ export class DexPosition extends ChainObject {
    * @param tickUpper - Upper tick boundary for the position.
    * @param tickLower - Lower tick boundary for the position.
    */
-  constructor(poolHash: string, nftId: string, tickUpper: number, tickLower: number) {
+  constructor(poolHash: string, positionId: string, tickUpper: number, tickLower: number) {
     super();
     this.poolHash = poolHash;
-    this.nftId = nftId;
+    this.positionId = positionId;
     this.tickUpper = tickUpper;
     this.tickLower = tickLower;
     this.liquidity = new BigNumber(0);

@@ -25,13 +25,12 @@ import {
   DexFeeConfig,
   DexNftBatchLimit,
   DexNftBatchLimitDto,
-  DexPosition,
+  DexPositionData,
   GetAddLiquidityEstimationDto,
   GetAddLiquidityEstimationResDto,
   GetLiquidityResDto,
   GetPoolDto,
   GetPositionDto,
-  GetPositionResDto,
   GetPositionWithNftIdDto,
   GetRemoveLiqEstimationResDto,
   GetUserPositionsDto,
@@ -144,21 +143,21 @@ export class DexV3Contract extends GalaContract {
   @GalaTransaction({
     type: EVALUATE,
     in: GetPositionDto,
-    out: DexPosition
+    out: DexPositionData
   })
-  public async GetPositions(ctx: GalaChainContext, dto: GetPositionDto): Promise<DexPosition> {
+  public async GetPositions(ctx: GalaChainContext, dto: GetPositionDto): Promise<DexPositionData> {
     return await getPosition(ctx, dto);
   }
 
   @GalaTransaction({
     type: EVALUATE,
     in: GetPositionWithNftIdDto,
-    out: DexPosition
+    out: DexPositionData
   })
   public async GetPositionWithNftId(
     ctx: GalaChainContext,
     dto: GetPositionWithNftIdDto
-  ): Promise<DexPosition> {
+  ): Promise<DexPositionData> {
     return await getPositionWithNftId(ctx, dto);
   }
 

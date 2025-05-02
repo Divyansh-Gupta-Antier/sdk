@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { DexPosition, GetPositionDto, NotFoundError, getFeeGrowthInside, sqrtPriceToTick } from "@gala-chain/api";
+import { DexPositionData, GetPositionDto, NotFoundError, getFeeGrowthInside, sqrtPriceToTick } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { GalaChainContext } from "../types";
@@ -25,9 +25,9 @@ import { fetchUserPositionInTickRange } from "./positionNft";
  * @param dto GetPositionDto - A data transfer object containing:
  - Pool identifiers – Class keys or token details required to identify the pool.
  - Positions identifier - lower tick, upper tick.
- * @returns DexPosition
+ * @returns DexPositionData
  */
-export async function getPosition(ctx: GalaChainContext, dto: GetPositionDto): Promise<DexPosition> {
+export async function getPosition(ctx: GalaChainContext, dto: GetPositionDto): Promise<DexPositionData> {
   // Fetch pool data based on input
   const pool = await getPoolData(ctx, dto);
   if (!pool) throw new NotFoundError("No pool for these tokens and fee exists");

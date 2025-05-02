@@ -47,7 +47,7 @@ import {
 } from "../utils";
 import { BigNumberProperty } from "../validators";
 import { ChainObject } from "./ChainObject";
-import { DexPosition } from "./DexPosition";
+import { DexPositionData } from "./DexPositionData";
 import { TokenClassKey } from "./TokenClass";
 
 @JSONSchema({
@@ -163,7 +163,7 @@ export class Pool extends ChainObject {
    * @return amount1 the amount of token1 owed to the pool, negative if the pool should pay the recipient
    */
   private _modifyPosition(
-    position: DexPosition,
+    position: DexPositionData,
     tickLower: number,
     tickUpper: number,
     liquidityDelta: BigNumber
@@ -209,7 +209,7 @@ export class Pool extends ChainObject {
    */
 
   public _updatePosition(
-    position: DexPosition,
+    position: DexPositionData,
     tickLower: number,
     tickUpper: number,
     liquidityDelta: BigNumber,
@@ -267,7 +267,7 @@ export class Pool extends ChainObject {
    * @return amount1 The amount of token1 that was paid to mint the given amount of liquidity
    */
   public mint(
-    position: DexPosition,
+    position: DexPositionData,
     tickLower: number,
     tickUpper: number,
     liquidity: BigNumber
@@ -353,7 +353,7 @@ export class Pool extends ChainObject {
       );
 
       //cap the tick in valid range i.e. MIN_TICK < tick < MAX_TICK
-      if (step.tickNext < DexPosition.MIN_TICK || step.tickNext > DexPosition.MAX_TICK) {
+      if (step.tickNext < DexPositionData.MIN_TICK || step.tickNext > DexPositionData.MAX_TICK) {
         throw new ConflictError("Not enough liquidity available in pool");
       }
 
@@ -450,7 +450,7 @@ export class Pool extends ChainObject {
    * @return amount0 The amount of token0 sent to the recipient
    * @return amount1 The amount of token1 sent to the recipient
    */
-  public burn(position: DexPosition, tickLower: number, tickUpper: number, amount: BigNumber): BigNumber[] {
+  public burn(position: DexPositionData, tickLower: number, tickUpper: number, amount: BigNumber): BigNumber[] {
     let [amount0, amount1] = this._modifyPosition(position, tickLower, tickUpper, amount.multipliedBy(-1));
 
     amount0 = amount0.abs();
@@ -537,7 +537,7 @@ export class Pool extends ChainObject {
    * @returns
    */
   public collect(
-    position: DexPosition,
+    position: DexPositionData,
     tickLower: number,
     tickUpper: number,
     amount0Requested: BigNumber,
@@ -573,7 +573,7 @@ export class Pool extends ChainObject {
    * @param tickUpper The upper tick of the position for which to collect fee accumulated
    * @returns
    */
-  public getFeeCollectedEstimation(position: DexPosition, tickLower: number, tickUpper: number) {
+  public getFeeCollectedEstimation(position: DexPositionData, tickLower: number, tickUpper: number) {
     // Calculate total fees accumulated in given tick range
     const tickCurrent = sqrtPriceToTick(this.sqrtPrice);
     const [feeGrowthInside0, feeGrowthInside1] = getFeeGrowthInside(
