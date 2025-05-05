@@ -202,3 +202,20 @@ export async function getDexPosition(
   ]);
   return getObjectByKey(ctx, DexPositionData, compositeKey);
 }
+
+/**
+ * Retrieves the user position object for a given holder and pool.
+ *
+ * @param ctx - GalaChain context object.
+ * @param positionHolder - The user's address or ID.
+ * @param poolHash - Identifier for the pool.
+ * @returns A Promise resolving to the user's DexPositionOwner object.
+ */
+export async function getUserPositionIds(
+  ctx: GalaChainContext,
+  positionHolder: string,
+  poolHash: string
+): Promise<DexPositionOwner> {
+  const compositeKey = ctx.stub.createCompositeKey(DexPositionOwner.INDEX_KEY, [positionHolder, poolHash]);
+  return getObjectByKey(ctx, DexPositionOwner, compositeKey);
+}
