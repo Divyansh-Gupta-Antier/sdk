@@ -26,7 +26,7 @@ import { GalaChainContext } from "../types";
 import { fetchDexProtocolFeeConfig, putChainObject } from "../utils";
 
 /**
- * @dev The setProtocolFee function updates the protocol fee percentage for a Uniswap V3 pool within the GalaChain ecosystem.
+ * @dev The setProtocolFee function updates the protocol fee percentage for a Decentralized exchange pool within the GalaChain ecosystem.
  * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
  * @param dto SetProtocolFeeDto – A data transfer object containing:
   - Pool identifier – The specific pool where the protocol fee is being updated.

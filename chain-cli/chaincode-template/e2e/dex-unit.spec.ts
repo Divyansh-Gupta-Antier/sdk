@@ -29,7 +29,6 @@ import {
   liquidity0,
   liquidity1,
   mostSignificantBit,
-  updatePositions
 } from "@gala-chain/api";
 import {
   checkTicks,
@@ -249,96 +248,6 @@ describe("validateTokenOrder", () => {
 describe("genNftId", () => {
   test("should concatenate parameters with '_'", () => {
     expect(genNftId("1", "2", "3", "4")).toBe("1$2$3$4");
-  });
-});
-
-describe("updatePositions", () => {
-  test("should initialize a new position if not existing", () => {
-    const positions = {};
-    const nftId = "1_1";
-    const tickLower = -10;
-    const tickUpper = 10;
-    const liquidityDelta = new BigNumber(100);
-    const feeGrowthInside0 = new BigNumber(5);
-    const feeGrowthInside1 = new BigNumber(10);
-
-    updatePositions(
-      positions,
-      nftId,
-      tickLower,
-      tickUpper,
-      liquidityDelta,
-      feeGrowthInside0,
-      feeGrowthInside1
-    );
-
-    expect(positions[nftId]).toBeTruthy();
-    expect(positions[nftId].liquidity).toBe("100");
-  });
-
-  test("should update liquidity and fees for an existing position", () => {
-    const positions = {};
-    const nftId = "1_1";
-    const tickLower = -10;
-    const tickUpper = 10;
-    const liquidityDelta = new BigNumber(100);
-    const feeGrowthInside0 = new BigNumber(5);
-    const feeGrowthInside1 = new BigNumber(10);
-
-    updatePositions(
-      positions,
-      nftId,
-      tickLower,
-      tickUpper,
-      liquidityDelta,
-      feeGrowthInside0,
-      feeGrowthInside1
-    );
-    updatePositions(
-      positions,
-      nftId,
-      tickLower,
-      tickUpper,
-      new BigNumber(50),
-      new BigNumber(8),
-      new BigNumber(15)
-    );
-    const position = positions[nftId];
-
-    expect(position.liquidity).toBe("150");
-    expect(position.feeGrowthInside0Last).toBe("8");
-    expect(position.feeGrowthInside1Last).toBe("15");
-  });
-
-  test("should throw error if decreasing liquidity below zero", () => {
-    const positions = {};
-    const nftId = "1_1";
-    const tickLower = -10;
-    const tickUpper = 10;
-    const liquidityDelta = new BigNumber(100);
-    const feeGrowthInside0 = new BigNumber(5);
-    const feeGrowthInside1 = new BigNumber(10);
-
-    updatePositions(
-      positions,
-      nftId,
-      tickLower,
-      tickUpper,
-      liquidityDelta,
-      feeGrowthInside0,
-      feeGrowthInside1
-    );
-    expect(() => {
-      updatePositions(
-        positions,
-        nftId,
-        tickLower,
-        tickUpper,
-        new BigNumber(-200),
-        feeGrowthInside0,
-        feeGrowthInside1
-      );
-    }).toThrow();
   });
 });
 

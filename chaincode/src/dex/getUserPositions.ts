@@ -11,12 +11,12 @@ import BigNumber from "bignumber.js";
 import { fetchBalancesWithTokenMetadata } from "../balances";
 import { fetchTokenClass } from "../token";
 import { GalaChainContext } from "../types";
-import { fetchDexPosition, genBookMark, genNftId, splitBookmark } from "../utils";
+import { fetchDexPosition, genBookMark, splitBookmark } from "../utils";
 import { getPoolFromAddressKey } from "./getFunctions";
 
 /**
    * 
-   * @dev The getUserPositions function retrieves all liquidity positions owned by a specific user across multiple Uniswap V3 pools within the GalaChain ecosystem. It provides details on the user's staked liquidity and associated rewards.
+   * @dev The getUserPositions function retrieves all liquidity positions owned by a specific user across multiple Decentralized exchange pools within the GalaChain ecosystem. It provides details on the user's staked liquidity and associated rewards.
    * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
    * @param dto GetUserPositionsDto – A data transfer object containing:
     - User address – The identifier for the user whose positions are being queried.

@@ -98,8 +98,9 @@ export class PositionDto extends ChainCallDTO {
   public token1: TokenClassKey;
   @EnumProperty(DexFeePercentageTypes)
   public fee: DexFeePercentageTypes;
-  @IsOptional()
-  public owner: string;
+  @ValidateIf((e) => e.owner !== undefined)
+  @IsUserAlias()
+  public owner?: string;
   @IsNotEmpty()
   @IsInt()
   @Max(MAX_TICK)
@@ -119,10 +120,10 @@ export class PositionDto extends ChainCallDTO {
     token0: TokenClassKey,
     token1: TokenClassKey,
     fee: DexFeePercentageTypes,
-    owner: string,
     tickLower: number,
     tickUpper: number,
-    liquidity: BigNumber
+    liquidity: BigNumber,
+    owner?: string,
   ) {
     super();
     this.token0 = token0;
@@ -240,9 +241,6 @@ export class BurnDto extends ChainCallDTO {
   @BigNumberProperty()
   @BigNumberIsPositive()
   public amount1Min: BigNumber;
-  @ValidateIf((e) => e.owner !== undefined)
-  @IsUserAlias()
-  public owner?: string;
 
   constructor(
     token0: TokenClassKey,
@@ -252,8 +250,7 @@ export class BurnDto extends ChainCallDTO {
     tickLower: number,
     tickUpper: number,
     amount0Min: BigNumber,
-    amount1Min: BigNumber,
-    owner?: string
+    amount1Min: BigNumber
   ) {
     super();
     this.tickLower = tickLower;
@@ -264,7 +261,6 @@ export class BurnDto extends ChainCallDTO {
     this.fee = fee;
     this.amount0Min = amount0Min;
     this.amount1Min = amount1Min;
-    this.owner = owner;
   }
 }
 
@@ -326,8 +322,8 @@ export class GetPositionDto extends ChainCallDTO {
   @Min(MIN_TICK)
   @IsLessThan("tickUpper")
   public tickLower: number;
-  @IsOptional()
-  @IsString()
+  @ValidateIf((e) => e.owner !== undefined)
+  @IsUserAlias()
   public owner?: string;
 
   constructor(
@@ -346,23 +342,6 @@ export class GetPositionDto extends ChainCallDTO {
     this.tickUpper = tickUpper;
     this.owner = owner;
   }
-}
-
-export class positionInfoDto {
-  @IsString()
-  public owner: string;
-  @IsString()
-  public liquidity: string;
-  @IsString()
-  public feeGrowthInside0Last: string;
-  @IsString()
-  public feeGrowthInside1Last: string;
-  @IsString()
-  // fees owed to the position owner in token0/token1
-  @IsString()
-  public tokensOwed0: string;
-  @IsString()
-  public tokensOwed1: string;
 }
 
 export class GetUserPositionsDto extends ChainCallDTO {
@@ -391,19 +370,35 @@ export class UserPositionDTO extends ChainCallDTO {
 }
 
 export class GetPositionResDto {
-  @IsNotEmpty()
+  @IsOptional()
+  @IsString()
+  poolAddrKey: string;
+
+  @IsOptional()
+  @IsString()
+  tickUpper: string;
+
+  @IsOptional()
+  @IsString()
+  tickLower: string;
+
+  @IsOptional()
   @IsString()
   liquidity: string;
-  @IsNotEmpty()
+
+  @IsOptional()
   @IsString()
   feeGrowthInside0Last: string;
+
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   feeGrowthInside1Last: string;
-  @IsNotEmpty()
+
+  @IsOptional()
   @IsString()
   tokensOwed0: string;
-  @IsNotEmpty()
+
+  @IsOptional()
   @IsString()
   tokensOwed1: string;
 }
@@ -666,9 +661,13 @@ export class SetProtocolFeeDto extends ChainCallDTO {
 }
 
 export interface IPosition {
-  tickLower: number;
-  tickUpper: number;
+  tickUpper: string;
+  tickLower: string;
   liquidity: string;
+  feeGrowthInside0Last: string;
+  feeGrowthInside1Last: string;
+  tokensOwed0: string;
+  tokensOwed1: string;
   token0Img?: string;
   token1Img?: string;
   token0InstanceKey?: TokenInstanceKey & {
@@ -809,8 +808,9 @@ export class BurnEstimateDto extends ChainCallDTO {
   @BigNumberProperty()
   @BigNumberIsPositive()
   public amount: BigNumber;
-  @IsOptional()
-  public owner: string | null;
+  @IsNotEmpty()
+  @IsUserAlias()
+  public owner: string;
 
   constructor(
     token0: TokenClassKey,

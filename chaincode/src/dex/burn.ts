@@ -14,30 +14,26 @@
  */
 import {
   BurnDto,
-  BurnTokenQuantity,
-  ConflictError,
   NotFoundError,
   Pool,
-  UserBalanceResDto
+  SlippageToleranceExceededError,
+  UserBalanceResDto,
+  liquidity0,
+  liquidity1,
+  tickToSqrtPrice
 } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { fetchOrCreateBalance } from "../balances";
-import { burnTokens } from "../burns";
 import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
-import {
-  convertToTokenInstanceKey,
-  deleteChainObject,
-  getObjectByKey,
-  putChainObject,
-  validateTokenOrder
-} from "../utils";
-import { fetchPositionNftInstanceKey, fetchUserPositionInTickRange } from "./positionNft";
+import { convertToTokenInstanceKey, getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
+import { fetchUserPositionInTickRange } from "./fetchUserPositionInTickRange";
+import { removeInactivePosition } from "./removeInactivePosition";
 
 /**
- * @dev The burn function is responsible for removing liquidity from a Uniswap V3 pool within the GalaChain ecosystem. It executes the necessary operations to burn the liquidity position and transfer the corresponding tokens back to the user.
+ * @dev The burn function is responsible for removing liquidity from a Decentralized exchange pool within the GalaChain ecosystem. It executes the necessary operations to burn the liquidity position and transfer the corresponding tokens back to the user.
  * @param ctx GalaChainContext – The execution context that provides access to the GalaChain environment.
  * @param dto BurnDto – A data transfer object containing the details of the liquidity position to be burned, including the pool, and position ID.
  * @returns UserBalanceResDto
@@ -48,13 +44,9 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<UserBal
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key);
 
-  //If pool does not exist
-  if (pool == undefined) throw new ConflictError("Pool does not exist");
-
-  const poolHash = pool.genPoolHash();
   const poolAlias = pool.getPoolAlias();
-
-  const position = await fetchUserPositionInTickRange(ctx, pool, dto.tickUpper, dto.tickLower);
+  const poolHash = pool.genPoolHash();
+  const position = await fetchUserPositionInTickRange(ctx, poolHash, dto.tickUpper, dto.tickLower);
 
   if (!position) throw new NotFoundError(`User doesn't hold any positions with this tick range in this pool`);
 
@@ -62,22 +54,10 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<UserBal
     tickUpper = parseInt(dto.tickUpper.toString());
 
   const amounts = pool.burn(position, tickLower, tickUpper, dto.amount.f18());
-
-  const deleteUserPos =
-    new BigNumber(position.tokensOwed0).f18().isZero() &&
-    new BigNumber(position.tokensOwed1).f18().isZero() &&
-    new BigNumber(position.liquidity).f18().isZero();
-
-  if (deleteUserPos) {
-    const burnTokenQuantity = new BurnTokenQuantity();
-    burnTokenQuantity.tokenInstanceKey = await fetchPositionNftInstanceKey(ctx, poolHash, position.nftId);
-    burnTokenQuantity.quantity = new BigNumber(1);
-    await burnTokens(ctx, {
-      owner: ctx.callingUser,
-      toBurn: [burnTokenQuantity],
-      preValidated: true
-    });
-    await deleteChainObject(ctx, position);
+  if (amounts[0].lt(dto.amount0Min) || amounts[1].lt(dto.amount1Min)) {
+    throw new SlippageToleranceExceededError(
+      `Slippage check failed: amount0: ${dto.amount0Min.toString()} <= ${amounts[0].toString()}, amount1: ${dto.amount1Min.toString()} <= ${amounts[1].toString()}`
+    );
   }
 
   //create tokenInstanceKeys
@@ -85,6 +65,46 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<UserBal
 
   //fetch token classes
   const tokenClasses = await Promise.all(tokenInstanceKeys.map((key) => fetchTokenClass(ctx, key)));
+  let amountToBurn = dto.amount.f18();
+  const amountsEstimated = pool.burnEstimate(amountToBurn, tickLower, tickUpper);
+  const sqrtPriceA = tickToSqrtPrice(tickLower),
+    sqrtPriceB = tickToSqrtPrice(tickUpper);
+  const sqrtPrice = pool.sqrtPrice;
+
+  for (const [index, amount] of amountsEstimated.entries()) {
+    if (amount.gt(0)) {
+      const poolTokenBalance = await fetchOrCreateBalance(
+        ctx,
+        poolAlias,
+        tokenInstanceKeys[index].getTokenClassKey()
+      );
+      const roundedAmount = BigNumber.min(
+        new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs(),
+        poolTokenBalance.getQuantityTotal()
+      );
+
+      // Check whether pool has enough liquidity to perform this operation and adjust accordingly
+      if (!roundedAmount.eq(new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs())) {
+        let maximumBurnableLiquidity: BigNumber;
+        if (index === 0) {
+          maximumBurnableLiquidity = liquidity0(
+            roundedAmount,
+            sqrtPrice.gt(sqrtPriceA) ? sqrtPrice : sqrtPriceA,
+            sqrtPriceB
+          );
+        } else {
+          maximumBurnableLiquidity = liquidity1(
+            roundedAmount,
+            sqrtPriceA,
+            sqrtPrice.lt(sqrtPriceB) ? sqrtPrice : sqrtPriceB
+          );
+        }
+        amountToBurn = BigNumber.min(amountToBurn, maximumBurnableLiquidity);
+      }
+    }
+  }
+
+  await removeInactivePosition(ctx, poolHash, position);
 
   for (const [index, amount] of amounts.entries()) {
     if (amount.gt(0)) {

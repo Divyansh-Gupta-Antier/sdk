@@ -21,35 +21,26 @@ import {
   GetAddLiquidityEstimationResDto,
   GetLiquidityResDto,
   GetPoolDto,
-  GetUserPositionsDto,
-  GetUserPositionsResDto,
-  IPosition,
   NotFoundError,
   Pool,
-  PositionsObject,
   Slot0ResDto,
   TokenClassKey,
-  TokenInstanceKey,
   UnauthorizedError,
   ValidationFailedError,
   sqrtPriceToTick
 } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
-import { fetchBalancesWithTokenMetadata } from "../balances";
-import { fetchTokenClass } from "../token";
 import { GalaChainContext } from "../types";
 import {
   fetchDexProtocolFeeConfig,
-  genBookMark,
   generateKeyFromClassKey,
   getObjectByKey,
-  splitBookmark,
   validateTokenOrder
 } from "../utils";
 
 /**
- * @dev The getPoolData function retrieves and returns all publicly available state information of a Uniswap V3 pool within the GalaChain ecosystem. It provides insights into the pool's tick map, liquidity positions, and other essential details.
+ * @dev The getPoolData function retrieves and returns all publicly available state information of a Decentralized exchange pool within the GalaChain ecosystem. It provides insights into the pool's tick map, liquidity positions, and other essential details.
  * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
  * @param dto GetPoolDto – A data transfer object containing:
   - Class keys for the tokens – Identifiers for the token pair in the pool.
@@ -73,7 +64,7 @@ export async function getPoolData(ctx: GalaChainContext, dto: GetPoolDto): Promi
 }
 
 /**
-   * @dev The slot0 function retrieves essential state variables from a Uniswap V3 pool within the GalaChain ecosystem. It provides core details such as the current square root price, tick, and liquidity.
+   * @dev The slot0 function retrieves essential state variables from a Decentralized exchange pool within the GalaChain ecosystem. It provides core details such as the current square root price, tick, and liquidity.
    * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
    * @param dto GetPoolDto – A data transfer object containing:
     - Pool identifiers – Class keys or token details needed to fetch the pool data.
@@ -90,7 +81,7 @@ export async function getSlot0(ctx: GalaChainContext, dto: GetPoolDto): Promise<
 }
 
 /**
-   * @dev The liquidity function retrieves the total available liquidity for a specific Uniswap V3 pool within the GalaChain ecosystem.
+   * @dev The liquidity function retrieves the total available liquidity for a specific Decentralized exchange pool within the GalaChain ecosystem.
    * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
    * @param dto GetPoolDto – A data transfer object containing:
     - Pool identifiers – Class keys or token details required to identify the pool.
@@ -126,7 +117,7 @@ export async function getPoolFromAddressKey(ctx: GalaChainContext, poolHash: str
 }
 
 /**
-   * @dev The getAddLiquidityEstimation function estimates the required token amounts and liquidity when adding liquidity to a Uniswap V3 pool within the GalaChain ecosystem.
+   * @dev The getAddLiquidityEstimation function estimates the required token amounts and liquidity when adding liquidity to a Decentralized exchange pool within the GalaChain ecosystem.
    * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
    * @param dto GetAddLiquidityEstimationDto – A data transfer object containing:
       token0 – The first token of the pool.

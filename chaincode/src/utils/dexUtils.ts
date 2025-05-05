@@ -16,7 +16,9 @@ import {
   ChainError,
   DexFeeConfig,
   DexPositionData,
+  DexPositionOwner,
   ErrorCode,
+  NotFoundError,
   Pool,
   TokenClassKey,
   TokenInstanceKey,
@@ -89,10 +91,6 @@ export function validateTokenOrder(token0: TokenClassKey, token1: TokenClassKey)
   return [normalizedToken0, normalizedToken1];
 }
 
-export function genNftId(...params: string[] | number[]): string {
-  return params.join("$");
-}
-
 export function genBookMark(...params: string[] | number[]): string {
   return params.join("|");
 }
@@ -100,6 +98,26 @@ export function genBookMark(...params: string[] | number[]): string {
 export function splitBookmark(bookmark = "") {
   const [chainBookmark = "", localBookmark = "0"] = bookmark.split("|");
   return { chainBookmark, localBookmark };
+}
+
+/**
+ * Generates a tick range string in the format "lower-upper".
+ */
+export function genTickRange(tickLower: number, tickUpper: number): string {
+  return [tickLower, tickUpper].join("-");
+}
+
+/**
+ * Parses a tick range string and returns the lower and upper ticks as numbers.
+ */
+export function parseTickRange(tickRange: string): [number, number] {
+  const [lower, upper] = tickRange.split("-").map(Number);
+
+  if (isNaN(lower) || isNaN(upper)) {
+    throw new Error(`Invalid tick range format: ${tickRange}`);
+  }
+
+  return [lower, upper];
 }
 
 /**
@@ -157,4 +175,30 @@ export async function fetchDexPosition(
   );
 
   return position;
+}
+
+/**
+ * Retrieves a DexPositionData object from the ledger.
+ *
+ * @param ctx - The chaincode stub context.
+ * @param poolHash - Unique identifier for the pool.
+ * @param tickUpper - Upper tick boundary for the position.
+ * @param tickLower - Lower tick boundary for the position.
+ * @param positionId - Unique identifier for the position.
+ * @returns The deserialized DexPositionData object.
+ */
+export async function getDexPosition(
+  ctx: GalaChainContext,
+  poolHash: string,
+  tickUpper: number,
+  tickLower: number,
+  positionId: string
+) {
+  const compositeKey = ctx.stub.createCompositeKey(DexPositionData.INDEX_KEY, [
+    poolHash,
+    tickUpper.toString(),
+    tickLower.toString(),
+    positionId
+  ]);
+  return getObjectByKey(ctx, DexPositionData, compositeKey);
 }

@@ -15,7 +15,6 @@
 import {
   AddLiquidityDTO,
   AddLiquidityResDto,
-  NotFoundError,
   Pool,
   SlippageToleranceExceededError,
   UserBalanceResDto,
@@ -29,10 +28,10 @@ import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
 import { convertToTokenInstanceKey, getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
-import { createPosition, fetchUserPositionInTickRange } from "./positionNft";
+import { fetchOrCreateDexPosition } from "./fetchOrCreateDexPosition";
 
 /**
- * @dev Function to add Liqudity to v3 pool. The addLiquidity function facilitates the addition of liquidity to a Uniswap V3 pool within the GalaChain ecosystem. It takes in the blockchain context, liquidity parameters, and an optional launchpad address, then executes the necessary operations to deposit assets into the specified liquidity pool.
+ * @dev Function to add Liqudity to v3 pool. The addLiquidity function facilitates the addition of liquidity to a Decentralized exchange pool within the GalaChain ecosystem. It takes in the blockchain context, liquidity parameters, and an optional launchpad address, then executes the necessary operations to deposit assets into the specified liquidity pool.
  * @param ctx GalaChainContext – The execution context that provides access to the GalaChain environment.
  * @param dto AddLiquidityDTO – A data transfer object containing liquidity details such as token amounts, pool parameters, and fee tiers.
  * @param launchpadAddress string – (Optional) The address of a launchpad contract if liquidity is being added via a specific launchpad mechanism.
@@ -47,9 +46,6 @@ export async function addLiquidity(
 
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key);
-
-  //If pool does not exist
-  if (pool == undefined) throw new NotFoundError("Pool does not exist");
   const currentSqrtPrice = pool.sqrtPrice;
 
   //create tokenInstanceKeys
@@ -60,9 +56,11 @@ export async function addLiquidity(
   const token0Class = await fetchTokenClass(ctx, token0InstanceKey);
   const token1Class = await fetchTokenClass(ctx, token1InstanceKey);
 
+  const liquidityProvider = launchpadAddress ?? ctx.callingUser;
   const tickLower = parseInt(dto.tickLower.toString()),
-    tickUpper = parseInt(dto.tickUpper.toString());
-
+  tickUpper = parseInt(dto.tickUpper.toString());
+  
+  //get token amounts required for the desired liquidity
   const amount0Desired = dto.amount0Desired.f18(),
     amount1Desired = dto.amount1Desired.f18();
   const amount0Min = dto.amount0Min.f18(),
@@ -81,38 +79,16 @@ export async function addLiquidity(
 
   const poolHash = pool.genPoolHash();
   const poolAlias = pool.getPoolAlias();
-  const position =
-    (await fetchUserPositionInTickRange(ctx, pool, dto.tickUpper, dto.tickLower)) ??
-    (await createPosition(ctx, poolHash, poolAlias, dto.tickUpper, dto.tickLower));
+  const position = await fetchOrCreateDexPosition(ctx, poolHash, tickUpper, tickLower);
 
   let [amount0, amount1] = pool.mint(position, tickLower, tickUpper, liquidity.f18());
-  [amount0, amount1] = [amount0.f18(), amount1.f18()];
 
-  if (
-    amount0.lt(amount0Min) ||
-    amount1.lt(amount1Min) ||
-    amount0.gt(amount0Desired) ||
-    amount1.gt(amount1Desired)
-  ) {
+  if (amount0.lt(amount0Min) || amount1.lt(amount1Min)) {
     throw new SlippageToleranceExceededError(
-      "Slippage check Failed, should be amount0: " +
-        amount0Min.toString() +
-        " <" +
-        amount0.toString() +
-        " <= " +
-        amount0Desired.toString() +
-        " amount1: " +
-        amount1Min.toString() +
-        " < " +
-        amount1.toString() +
-        " <= " +
-        amount1Desired.toString() +
-        " liquidity: " +
-        liquidity.toString()
+      `Slippage check failed: amount0: ${amount0Min.toString()} <= ${amount0.toString()}, amount1: ${amount1Min.toString()} <= ${amount1.toString()}, liquidity: ${liquidity.toString()}`
     );
   }
 
-  const liquidityProvider = launchpadAddress ? launchpadAddress : ctx.callingUser;
   if (amount0.isGreaterThan(0)) {
     // transfer token0
     await transferToken(ctx, {
@@ -142,6 +118,7 @@ export async function addLiquidity(
     });
   }
 
+  await putChainObject(ctx, position);
   await putChainObject(ctx, pool);
 
   const liquidityProviderToken0Balance = await fetchOrCreateBalance(ctx, ctx.callingUser, token0InstanceKey);

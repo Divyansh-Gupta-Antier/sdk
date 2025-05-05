@@ -27,7 +27,7 @@ import {
 } from "../utils";
 
 /**
- * @dev The swap function executes a token swap in a Uniswap V3-like liquidity pool within the GalaChain ecosystem.
+ * @dev The swap function executes a token swap in a Decentralized exchange pool within the GalaChain ecosystem.
  * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
  * @param dto SwapDto – A data transfer object containing:
   - tokenIn – The input token being swapped.
@@ -47,9 +47,6 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
 
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key);
-
-  //If pool does not exist
-  if (pool == undefined) throw new ConflictError("Pool does not exist");
 
   const amounts = pool.swap(zeroForOne, dto.amount, sqrtPriceLimit);
   const poolAlias = pool.getPoolAlias();
@@ -85,6 +82,13 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
         poolAlias,
         tokenInstanceKeys[index].getTokenClassKey()
       );
+      if (
+        new BigNumber(amount.toFixed(tokenClasses[index].decimals))
+          .abs()
+          .gt(poolTokenBalance.getQuantityTotal())
+      ) {
+        throw new ConflictError("Not enough liquidity available in pool");
+      }
       const roundedAmount = BigNumber.min(
         new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs(),
         poolTokenBalance.getQuantityTotal()

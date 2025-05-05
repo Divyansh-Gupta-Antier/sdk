@@ -28,7 +28,7 @@ import { ChainObject } from "./ChainObject";
 })
 export class DexPositionData extends ChainObject {
   @Exclude()
-  static INDEX_KEY = "GCDP"; //GalaChain Dex Position
+  static INDEX_KEY = "GCDPD"; //GalaChain Dex Position Data
 
   @JSONSchema({
     description: "Minimum tick value allowed for the pool"
@@ -87,7 +87,7 @@ export class DexPositionData extends ChainObject {
    * Initializes a new instance of the pool position.
    *
    * @param poolHash - Unique identifier for the pool.
-   * @param nftId - Identifier for the NFT representing the position.
+   * @param positionId - Unique identifier for this position.
    * @param tickUpper - Upper tick boundary for the position.
    * @param tickLower - Lower tick boundary for the position.
    */

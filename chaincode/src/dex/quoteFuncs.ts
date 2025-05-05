@@ -19,7 +19,7 @@ import { GalaChainContext } from "../types";
 import { getObjectByKey, validateTokenOrder } from "../utils";
 
 /**
- * @dev The quoteExactAmount function calculates the required amount of the other token for a swap or liquidity addition in a Uniswap V3 pool within the GalaChain ecosystem.
+ * @dev The quoteExactAmount function calculates the required amount of the other token for a swap or liquidity addition in a Decentralized exchange pool within the GalaChain ecosystem.
  * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
  * @param dto QuoteExactAmountDto – A data transfer object containing:
   - Input token details – Specifies which token and amount are being provided.
@@ -40,7 +40,6 @@ export async function quoteExactAmount(
 
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key);
-  if (pool == undefined) throw new NotFoundError("Pool does not exist");
 
   const currentSqrtPrice = pool.sqrtPrice;
   const amounts = pool.swap(

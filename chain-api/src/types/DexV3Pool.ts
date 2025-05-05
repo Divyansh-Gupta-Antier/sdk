@@ -32,6 +32,8 @@ import {
   computeSwapStep,
   feeAmountTickSpacing,
   flipTick,
+  genKey,
+  genPoolAlias,
   getAmount0Delta,
   getAmount1Delta,
   getFeeGrowthInside,
@@ -47,11 +49,12 @@ import {
 } from "../utils";
 import { BigNumberProperty } from "../validators";
 import { ChainObject } from "./ChainObject";
+import { DexFeePercentageTypes } from "./DexDtos";
 import { DexPositionData } from "./DexPositionData";
 import { TokenClassKey } from "./TokenClass";
 
 @JSONSchema({
-  description: "Uniswap V3 pool chain object with the core contract functionality."
+  description: "Decentralized exchange pool chain object with the core contract functionality."
 })
 export class Pool extends ChainObject {
   @Exclude()
@@ -67,7 +70,7 @@ export class Pool extends ChainObject {
 
   @ChainKey({ position: 2 })
   @IsNumber()
-  public readonly fee: number;
+  public readonly fee: DexFeePercentageTypes;
 
   @ValidateNested()
   @Type(() => TokenClassKey)
@@ -126,7 +129,7 @@ export class Pool extends ChainObject {
     token1: string,
     token0ClassKey: TokenClassKey,
     token1ClassKey: TokenClassKey,
-    fee: number,
+    fee: DexFeePercentageTypes,
     initialSqrtPrice: BigNumber,
     protocolFees = 0
   ) {
@@ -450,7 +453,12 @@ export class Pool extends ChainObject {
    * @return amount0 The amount of token0 sent to the recipient
    * @return amount1 The amount of token1 sent to the recipient
    */
-  public burn(position: DexPositionData, tickLower: number, tickUpper: number, amount: BigNumber): BigNumber[] {
+  public burn(
+    position: DexPositionData,
+    tickLower: number,
+    tickUpper: number,
+    amount: BigNumber
+  ): BigNumber[] {
     let [amount0, amount1] = this._modifyPosition(position, tickLower, tickUpper, amount.multipliedBy(-1));
 
     amount0 = amount0.abs();
@@ -560,7 +568,6 @@ export class Pool extends ChainObject {
       throw new ConflictError("Less balance accumulated");
     }
     position.tokensOwed0 = new BigNumber(position.tokensOwed0).minus(amount0Requested);
-
     position.tokensOwed1 = new BigNumber(position.tokensOwed1).minus(amount1Requested);
 
     return [amount0Requested, amount1Requested];
@@ -615,5 +622,42 @@ export class Pool extends ChainObject {
    */
   public getPoolAlias() {
     return `service|pool_${this.genPoolHash()}`;
+  }
+
+  /**
+   * Estimates the amount of token0 and token1 required to burn a given liquidity amount
+   * within a specified tick range.
+   *
+   * @param liquidityDelta - The amount of liquidity to be removed (burned).
+   * @param tickLower - The lower tick boundary of the burn range.
+   * @param tickUpper - The upper tick boundary of the burn range.
+   * @returns A tuple containing:
+   *  - amount0Req: The estimated amount of token0 to be burned.
+   *  - amount1Req: The estimated amount of token1 to be burned.
+   */
+  public burnEstimate(
+    liquidityDelta: BigNumber,
+    tickLower: number,
+    tickUpper: number
+  ): [amount0Req: BigNumber, amount1Req: BigNumber] {
+    const sqrtPriceLower = tickToSqrtPrice(tickLower);
+    const sqrtPriceUpper = tickToSqrtPrice(tickUpper);
+
+    let amount0Req: BigNumber = new BigNumber(0),
+      amount1Req: BigNumber = new BigNumber(0);
+
+    if (!liquidityDelta.isEqualTo(0)) {
+      //current tick is below the desired range
+      if (this.sqrtPrice.isLessThan(sqrtPriceLower))
+        amount0Req = getAmount0Delta(sqrtPriceLower, sqrtPriceUpper, liquidityDelta);
+      //current tick is in the desired range
+      else if (this.sqrtPrice.isLessThan(sqrtPriceUpper)) {
+        amount0Req = getAmount0Delta(this.sqrtPrice, sqrtPriceUpper, liquidityDelta);
+        amount1Req = getAmount1Delta(sqrtPriceLower, this.sqrtPrice, liquidityDelta);
+      }
+      //current tick is above the desired range
+      else amount1Req = getAmount1Delta(sqrtPriceLower, sqrtPriceUpper, liquidityDelta);
+    }
+    return [amount0Req, amount1Req];
   }
 }

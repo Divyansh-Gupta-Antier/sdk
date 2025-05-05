@@ -12,32 +12,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {
-  BurnTokenQuantity,
-  CollectDto,
-  ConflictError,
-  NotFoundError,
-  Pool,
-  UserBalanceResDto
-} from "@gala-chain/api";
+import { CollectDto, NotFoundError, Pool, UserBalanceResDto } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { fetchOrCreateBalance } from "../balances";
-import { burnTokens } from "../burns";
 import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
 import {
   convertToTokenInstanceKey,
-  deleteChainObject,
   getObjectByKey,
   putChainObject,
   validateTokenOrder
 } from "../utils";
-import { fetchPositionNftInstanceKey, fetchUserPositionInTickRange } from "./positionNft";
+import { fetchUserPositionInTickRange } from "./fetchUserPositionInTickRange";
+import { removeInactivePosition } from "./removeInactivePosition";
 
 /**
- * @dev The collect function allows a user to claim and withdraw accrued fee tokens from a specific liquidity position in a Uniswap V3 pool within the GalaChain ecosystem. It retrieves earned fees based on the user's position details and transfers them to the user's account.
+ * @dev The collect function allows a user to claim and withdraw accrued fee tokens from a specific liquidity position in a Decentralized exchange pool within the GalaChain ecosystem. It retrieves earned fees based on the user's position details and transfers them to the user's account.
  * @param ctx  GalaChainContext – The execution context providing access to the GalaChain environment.
  * @param dto Position details (pool information, tickUpper, tickLower).
 
@@ -47,44 +39,41 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
   const [token0, token1] = validateTokenOrder(dto.token0, dto.token1);
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key);
-  const [amount0Requested, amount1Requested] = [dto.amount0Requested.f18(), dto.amount1Requested.f18()];
-
-  //If pool does not exist
-  if (pool == undefined) throw new ConflictError("Pool does not exist");
 
   const poolHash = pool.genPoolHash();
   const poolAlias = pool.getPoolAlias();
-  const position = await fetchUserPositionInTickRange(ctx, pool, dto.tickUpper, dto.tickLower);
+  const position = await fetchUserPositionInTickRange(ctx, poolHash, dto.tickUpper, dto.tickLower);
   if (!position) throw new NotFoundError(`User doesn't hold any positions with this tick range in this pool`);
-
-  const tickLower = parseInt(dto.tickLower.toString()),
-    tickUpper = parseInt(dto.tickUpper.toString());
-
-  const amounts = pool.collect(position, tickLower, tickUpper, amount0Requested, amount1Requested);
-
-  const deleteUserPos =
-    new BigNumber(position.tokensOwed0).f18().isZero() &&
-    new BigNumber(position.tokensOwed1).f18().isZero() &&
-    new BigNumber(position.liquidity).f18().isZero();
-
-  if (deleteUserPos) {
-    const burnTokenQuantity = new BurnTokenQuantity();
-    burnTokenQuantity.tokenInstanceKey = await fetchPositionNftInstanceKey(ctx, poolHash, position.nftId);
-    burnTokenQuantity.quantity = new BigNumber(1);
-    await burnTokens(ctx, {
-      owner: ctx.callingUser,
-      toBurn: [burnTokenQuantity],
-      preValidated: true
-    });
-    await deleteChainObject(ctx, position);
-  }
-  await putChainObject(ctx, pool);
 
   //create tokenInstanceKeys
   const tokenInstanceKeys = [pool.token0ClassKey, pool.token1ClassKey].map(convertToTokenInstanceKey);
 
   //fetch token classes
   const tokenClasses = await Promise.all(tokenInstanceKeys.map((key) => fetchTokenClass(ctx, key)));
+
+  const poolToken0Balance = await fetchOrCreateBalance(
+    ctx,
+    poolAlias,
+    tokenInstanceKeys[0].getTokenClassKey()
+  );
+  const poolToken1Balance = await fetchOrCreateBalance(
+    ctx,
+    poolAlias,
+    tokenInstanceKeys[1].getTokenClassKey()
+  );
+
+  const [amount0Requested, amount1Requested] = [
+    BigNumber.min(dto.amount0Requested.f18(), poolToken0Balance.getQuantityTotal()),
+    BigNumber.min(dto.amount1Requested.f18(), poolToken1Balance.getQuantityTotal())
+  ];
+
+  const tickLower = parseInt(dto.tickLower.toString()),
+    tickUpper = parseInt(dto.tickUpper.toString());
+
+  const amounts = pool.collect(position, tickLower, tickUpper, amount0Requested, amount1Requested);
+
+  await removeInactivePosition(ctx, poolHash, position);
+  await putChainObject(ctx, pool);
 
   for (const [index, amount] of amounts.entries()) {
     if (amount.gt(0)) {
@@ -102,7 +91,7 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
         from: poolAlias,
         to: ctx.callingUser,
         tokenInstanceKey: tokenInstanceKeys[index],
-        quantity: roundedAmount,
+        quantity: new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs(),
         allowancesToUse: [],
         authorizedOnBehalf: {
           callingOnBehalf: poolAlias,

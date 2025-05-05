@@ -20,7 +20,7 @@ import { getPoolData } from "./getFunctions";
 import { fetchUserPositionInTickRange } from "./positionNft";
 
 /**
- * @dev The positions function retrieves details of a specific liquidity position within a Uniswap V3 pool on the GalaChain ecosystem. It provides insights into the user's position, including token amounts, fees, and other state variables.
+ * @dev The positions function retrieves details of a specific liquidity position within a Decentralized exchange pool on the GalaChain ecosystem. It provides insights into the user's position, including token amounts, fees, and other state variables.
  * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
  * @param dto GetPositionDto - A data transfer object containing:
  - Pool identifiers – Class keys or token details required to identify the pool.

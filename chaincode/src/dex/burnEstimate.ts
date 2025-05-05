@@ -12,40 +12,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { BurnDto, GetRemoveLiqEstimationResDto, NotFoundError, Pool } from "@gala-chain/api";
+import { BurnEstimateDto, GetRemoveLiqEstimationResDto, NotFoundError, Pool } from "@gala-chain/api";
 
 import { GalaChainContext } from "../types";
 import { getObjectByKey, validateTokenOrder } from "../utils";
-import { fetchUserPositionInTickRange } from "./positionNft";
+import { fetchUserPositionInTickRange } from "./fetchUserPositionInTickRange";
 
 /**
- * @dev The getRemoveLiquidityEstimation function estimates the amount of tokens a user will receive when removing liquidity from a Uniswap V3 pool within the GalaChain ecosystem. It calculates the expected token amounts based on the user's liquidity position and market conditions.
+ * @dev The getRemoveLiquidityEstimation function estimates the amount of tokens a user will receive when removing liquidity from a Decentralized exchange pool within the GalaChain ecosystem. It calculates the expected token amounts based on the user's liquidity position and market conditions.
  * @param ctx GalaChainContext – The execution context providing access to the GalaChain environment.
- * @param dto BurnDto – A data transfer object containing details of the liquidity position to be removed, including pool information, token amounts, and position ID.
+ * @param dto BurnEstimateDto – A data transfer object containing details of the liquidity position to be removed, including pool information, token amounts, and position ID.
  * @returns array with estimated value recieved after burning the positions
  */
 export async function getRemoveLiquidityEstimation(
   ctx: GalaChainContext,
-  dto: BurnDto
+  dto: BurnEstimateDto
 ): Promise<GetRemoveLiqEstimationResDto> {
   const [token0, token1] = validateTokenOrder(dto.token0, dto.token1);
 
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key);
 
-  //If pool does not exist
-  if (pool == undefined) throw new NotFoundError("Pool does not exist");
-
   const position = await fetchUserPositionInTickRange(
     ctx,
-    pool,
+    pool.genPoolHash(),
     dto.tickUpper,
     dto.tickLower,
     dto.owner
   );
-
-  if (!position)
-    throw new NotFoundError(`User doesn't hold any positions with this tick range in this pool`);
 
   const tickLower = parseInt(dto.tickLower.toString()),
     tickUpper = parseInt(dto.tickUpper.toString());
