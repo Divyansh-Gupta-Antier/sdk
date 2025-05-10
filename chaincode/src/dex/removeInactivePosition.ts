@@ -42,7 +42,7 @@ export async function removeInactivePosition(ctx: GalaChainContext, poolHash: st
   // Remove position
   if (deleteUserPos) {
     const tickRange = genTickRange(position.tickLower, position.tickUpper);
-    userPositions.removePosition(tickRange);
+    userPositions.removePosition(tickRange,position.positionId);
     await deleteChainObject(ctx, position);
     await putChainObject(ctx, userPositions);
   }

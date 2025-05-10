@@ -16,6 +16,7 @@ import BigNumber from "bignumber.js";
 
 import { ValidationFailedError } from "../error";
 import { leastSignificantBit, mostSignificantBit } from "./bitMath.helper";
+import { TickData } from "./dexHelperDtos";
 import { Bitmap, TickDataObj } from "./dexHelperDtos";
 
 const MIN_TICK = -887272,
@@ -63,17 +64,18 @@ export function updateTick(
   upper: boolean,
   feeGrowthGlobal0: BigNumber,
   feeGrowthGlobal1: BigNumber,
+
   maxLiquidity: BigNumber
 ): boolean {
   //initialise tickData for the required tick
-  if (tickData[tick] == undefined)
-    tickData[tick] = {
-      liquidityGross: new BigNumber(0).toString(),
-      initialised: false,
-      liquidityNet: new BigNumber(0).toString(),
-      feeGrowthOutside0: new BigNumber(0).toString(),
-      feeGrowthOutside1: new BigNumber(0).toString()
-    };
+  // if (tickData[tick] == undefined)
+  //   tickData[tick] = {
+  //     liquidityGross: new BigNumber(0).toString(),
+  //     initialised: false,
+  //     liquidityNet: new BigNumber(0).toString(),
+  //     feeGrowthOutside0: new BigNumber(0).toString(),
+  //     feeGrowthOutside1: new BigNumber(0).toString()
+  //   };
 
   const liquidityGrossBefore = new BigNumber(tickData[tick].liquidityGross);
   const liquidityGrossAfter = new BigNumber(liquidityGrossBefore).plus(liquidityDelta);
@@ -82,16 +84,16 @@ export function updateTick(
     throw new ValidationFailedError("liquidity crossed max liquidity");
 
   //update liquidity gross and net
-  tickData[tick].liquidityGross = liquidityGrossAfter.toString();
+  tickData[tick].liquidityGross = liquidityGrossAfter;
   tickData[tick].liquidityNet = upper
-    ? new BigNumber(tickData[tick].liquidityNet).minus(liquidityDelta).toString()
-    : new BigNumber(tickData[tick].liquidityNet).plus(liquidityDelta).toString();
+    ? new BigNumber(tickData[tick].liquidityNet).minus(liquidityDelta)
+    : new BigNumber(tickData[tick].liquidityNet).plus(liquidityDelta);
 
   //tick is initialised for the first time
   if (liquidityGrossBefore.isEqualTo(0)) {
     if (tick <= tickCurrent) {
-      tickData[tick].feeGrowthOutside0 = feeGrowthGlobal0.toString();
-      tickData[tick].feeGrowthOutside1 = feeGrowthGlobal1.toString();
+      tickData[tick].feeGrowthOutside0 = feeGrowthGlobal0;
+      tickData[tick].feeGrowthOutside1 = feeGrowthGlobal1;
     }
     tickData[tick].initialised = true;
     return true;
@@ -226,21 +228,17 @@ export function tickCross(
   feeGrowthGlobal1: BigNumber
 ): BigNumber {
   //initialise tickData for the required tick
-  if (tickData[tick] == undefined)
-    tickData[tick] = {
-      liquidityGross: new BigNumber(0).toString(),
-      initialised: false,
-      liquidityNet: new BigNumber(0).toString(),
-      feeGrowthOutside0: new BigNumber(0).toString(),
-      feeGrowthOutside1: new BigNumber(0).toString()
-    };
+  // if (tickData[tick] == undefined)
+  //   tickData[tick] = {
+  //     liquidityGross: new BigNumber(0),
+  //     initialised: false,
+  //     liquidityNet: new BigNumber(0),
+  //     feeGrowthOutside0: new BigNumber(0),
+  //     feeGrowthOutside1: new BigNumber(0)
+  //   };
 
-  tickData[tick].feeGrowthOutside0 = feeGrowthGlobal0
-    .minus(new BigNumber(tickData[tick].feeGrowthOutside0))
-    .toString();
-  tickData[tick].feeGrowthOutside1 = feeGrowthGlobal1
-    .minus(new BigNumber(tickData[tick].feeGrowthOutside1))
-    .toString();
+  tickData[tick].feeGrowthOutside0 = feeGrowthGlobal0.minus(new BigNumber(tickData[tick].feeGrowthOutside0));
+  tickData[tick].feeGrowthOutside1 = feeGrowthGlobal1.minus(new BigNumber(tickData[tick].feeGrowthOutside1));
 
   return new BigNumber(tickData[tick].liquidityNet);
 }

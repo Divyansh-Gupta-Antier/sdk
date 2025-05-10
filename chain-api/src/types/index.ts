@@ -68,6 +68,7 @@ export * from "./TokenMintConfiguration";
 export * from "./TokenMintFulfillment";
 export * from "./TokenMintRequest";
 export * from "./TokenBurnCounter";
+export * from "./TickData";
 export * from "./VestingToken";
 export * from "./DexDtos";
 export * from "./DexV3Pool";

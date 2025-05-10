@@ -29,6 +29,7 @@ import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
 import { convertToTokenInstanceKey, getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
+import { getOrDefautTickDataPair } from "../utils";
 import { fetchUserPositionInTickRange } from "./fetchUserPositionInTickRange";
 import { removeInactivePosition } from "./removeInactivePosition";
 
@@ -52,13 +53,6 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<UserBal
 
   const tickLower = parseInt(dto.tickLower.toString()),
     tickUpper = parseInt(dto.tickUpper.toString());
-
-  const amounts = pool.burn(position, tickLower, tickUpper, dto.amount.f18());
-  if (amounts[0].lt(dto.amount0Min) || amounts[1].lt(dto.amount1Min)) {
-    throw new SlippageToleranceExceededError(
-      `Slippage check failed: amount0: ${dto.amount0Min.toString()} <= ${amounts[0].toString()}, amount1: ${dto.amount1Min.toString()} <= ${amounts[1].toString()}`
-    );
-  }
 
   //create tokenInstanceKeys
   const tokenInstanceKeys = [pool.token0ClassKey, pool.token1ClassKey].map(convertToTokenInstanceKey);
@@ -104,6 +98,15 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<UserBal
     }
   }
 
+  const tickData = await getOrDefautTickDataPair(ctx, poolHash, tickLower, tickUpper);
+
+  const amounts = pool.burn(position, tickLower, tickUpper, amountToBurn, tickData);
+  if (amounts[0].lt(dto.amount0Min) || amounts[1].lt(dto.amount1Min)) {
+    throw new SlippageToleranceExceededError(
+      `Slippage check failed: amount0: ${dto.amount0Min.toString()} <= ${amounts[0].toString()}, amount1: ${dto.amount1Min.toString()} <= ${amounts[1].toString()}`
+    );
+  }
+
   await removeInactivePosition(ctx, poolHash, position);
 
   for (const [index, amount] of amounts.entries()) {
@@ -132,6 +135,8 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<UserBal
     }
   }
   await putChainObject(ctx, pool);
+  await putChainObject(ctx,tickData[tickUpper]);
+  await putChainObject(ctx, tickData[tickLower])
 
   const liquidityProviderToken0Balance = await fetchOrCreateBalance(
     ctx,

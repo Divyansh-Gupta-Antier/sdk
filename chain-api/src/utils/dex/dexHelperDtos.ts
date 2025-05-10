@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) Gala Games Inc. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { TickData } from "@gala-chain/api";
 import { IsBoolean, IsOptional, IsString } from "class-validator";
 
 export class TickDataObj {
   [key: string]: TickData;
 }
-
+ 
 export class Bitmap {
   [key: number | string]: string;
 }

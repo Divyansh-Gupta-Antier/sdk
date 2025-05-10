@@ -21,11 +21,65 @@ import { IsUserAlias } from "../validators";
 import { ChainObject } from "./ChainObject";
 
 @JSONSchema({
-    description:
-      `Represents a position owned by a user in a decentralized exchange (DEX) pool.` +
-      `Each position is linked to a specific pool, defined by tick range mappings, and associated with a unique position ID.` +
-      `The position also includes ownership details and the pool's unique identifier.`
-  })
+  description:
+    `Represents a position owned by a user in a decentralized exchange (DEX) pool.` +
+    `Each position is linked to a specific pool, defined by tick range mappings, and associated with a unique position ID.` +
+    `The position also includes ownership details and the pool's unique identifier.`
+})
+// export class DexPositionOwner extends ChainObject {
+//   @Exclude()
+//   static INDEX_KEY = "GCDPO"; //GalaChain Dex Position Owner
+
+//   @ChainKey({ position: 0 })
+//   @IsNotEmpty()
+//   @IsUserAlias()
+//   owner: string;
+
+//   @ChainKey({ position: 1 })
+//   @IsNotEmpty()
+//   @IsString()
+//   poolHash: string;
+
+//   tickRangeMap: Record<string, string>;
+
+//   /**
+//    * Intiializes a new DexPositionOwner instance.
+//    * @param owner - User alias of the position owner.
+//    * @param poolHash - Unique identifier of the pool.
+//    */
+//   constructor(owner: string, poolHash: string) {
+//     super();
+//     this.owner = owner;
+//     this.poolHash = poolHash;
+//     this.tickRangeMap = {};
+//   }
+
+//   /**
+//    * Adds or updates a position ID for the specified tick range.
+//    * @param tickRange - Tick range string to map (e.g., "10-20").
+//    * @param positionId - ID of the position to associate.
+//    */
+//   addPosition(tickRange: string, positionId: string): void {
+//     this.tickRangeMap[tickRange] = positionId;
+//   }
+
+//   /**
+//    * Removes the position mapping for the given tick range.
+//    * @param tickRange - Tick range string to remove.
+//    */
+//   removePosition(tickRange: string): void {
+//     delete this.tickRangeMap[tickRange];
+//   }
+
+//   /**
+//    * Retrieves the position ID for the specified tick range.
+//    * @param tickRange - Tick range string to look up.
+//    * @returns The associated position ID, or undefined if not found.
+//    */
+//   getPositionId(tickRange: string): string | undefined {
+//     return this.tickRangeMap[tickRange];
+//   }
+// }
 export class DexPositionOwner extends ChainObject {
   @Exclude()
   static INDEX_KEY = "GCDPO"; //GalaChain Dex Position Owner
@@ -40,8 +94,7 @@ export class DexPositionOwner extends ChainObject {
   @IsString()
   poolHash: string;
 
-  @IsString({ each: true })
-  tickRangeMap: Record<string, string>;
+  tickRangeMap: Record<string, string[]>;
 
   /**
    * Intiializes a new DexPositionOwner instance.
@@ -52,6 +105,7 @@ export class DexPositionOwner extends ChainObject {
     super();
     this.owner = owner;
     this.poolHash = poolHash;
+    this.tickRangeMap = {};
   }
 
   /**
@@ -60,15 +114,22 @@ export class DexPositionOwner extends ChainObject {
    * @param positionId - ID of the position to associate.
    */
   addPosition(tickRange: string, positionId: string): void {
-    this.tickRangeMap[tickRange] = positionId;
+    if (!this.tickRangeMap[tickRange]) {
+      this.tickRangeMap[tickRange] = [];
+    }
+    this.tickRangeMap[tickRange].push(positionId);
   }
-
   /**
    * Removes the position mapping for the given tick range.
    * @param tickRange - Tick range string to remove.
    */
-  removePosition(tickRange: string): void {
-    delete this.tickRangeMap[tickRange];
+  removePosition(tickRange: string, positionId: string): void {
+    const positions = this.tickRangeMap[tickRange];
+    this.tickRangeMap[tickRange] = positions.filter((id) => id !== positionId);
+
+    if (this.tickRangeMap[tickRange].length === 0) {
+      delete this.tickRangeMap[tickRange];
+    }
   }
 
   /**
@@ -76,7 +137,21 @@ export class DexPositionOwner extends ChainObject {
    * @param tickRange - Tick range string to look up.
    * @returns The associated position ID, or undefined if not found.
    */
-  getPositionId(tickRange: string): string | undefined {
-    return this.tickRangeMap[tickRange];
+  getPositionId(tickRange: string, positionId: string): string | undefined {
+    return this.tickRangeMap[tickRange].find((id) => id === positionId);
+  }
+
+  getPositionIds(tickRange: string): string {
+    const position = this.tickRangeMap[tickRange];
+    return position[0];
+  }
+
+  getTickRangeByPositionId(positionId: string): string | undefined {
+    for (const tickRange in this.tickRangeMap) {
+      if (this.tickRangeMap[tickRange].includes(positionId)) {
+        return tickRange;
+      }
+    }
+    return undefined;
   }
 }

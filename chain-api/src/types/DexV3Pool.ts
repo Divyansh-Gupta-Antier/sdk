@@ -14,7 +14,7 @@
  */
 import BigNumber from "bignumber.js";
 import { Exclude, Type } from "class-transformer";
-import { IsNumber, IsString, ValidateNested } from "class-validator";
+import { IsEnum, IsNumber, IsString, ValidateNested, isEnum } from "class-validator";
 import { JSONSchema } from "class-validator-jsonschema";
 import { keccak256 } from "js-sha3";
 
@@ -84,10 +84,6 @@ export class Pool extends ChainObject {
   @Type(() => Bitmap)
   public bitmap: Bitmap;
 
-  @ValidateNested()
-  @Type(() => TickData)
-  public tickData: TickDataObj;
-
   @BigNumberProperty()
   public sqrtPrice: BigNumber;
 
@@ -140,7 +136,7 @@ export class Pool extends ChainObject {
     this.token1ClassKey = token1ClassKey;
     this.fee = fee;
     this.bitmap = {};
-    this.tickData = {};
+
     this.sqrtPrice = initialSqrtPrice;
     this.liquidity = new BigNumber(0);
     this.feeGrowthGlobal0 = new BigNumber(0);
@@ -169,7 +165,8 @@ export class Pool extends ChainObject {
     position: DexPositionData,
     tickLower: number,
     tickUpper: number,
-    liquidityDelta: BigNumber
+    liquidityDelta: BigNumber,
+    tickData: TickDataObj
   ): BigNumber[] {
     //tick to Price
     const sqrtPriceLower = tickToSqrtPrice(tickLower);
@@ -179,7 +176,7 @@ export class Pool extends ChainObject {
     // Common checks for valid tick input
     checkTicks(tickLower, tickUpper);
 
-    this._updatePosition(position, tickLower, tickUpper, liquidityDelta, tickCurrent);
+    this._updatePosition(position, tickLower, tickUpper, liquidityDelta, tickCurrent, tickData);
 
     //amounts of tokens required to provided given liquidity
     let amount0Req = new BigNumber(0),
@@ -216,12 +213,14 @@ export class Pool extends ChainObject {
     tickLower: number,
     tickUpper: number,
     liquidityDelta: BigNumber,
-    tickCurrent: number
+
+    tickCurrent: number,
+    tickData: TickDataObj
   ) {
     if (!liquidityDelta.isEqualTo(0)) {
       //update ticks
       const flippedLower = updateTick(
-        this.tickData,
+        tickData,
         tickLower,
         tickCurrent,
         liquidityDelta,
@@ -231,7 +230,7 @@ export class Pool extends ChainObject {
         this.maxLiquidityPerTick
       );
       const flippedUpper = updateTick(
-        this.tickData,
+        tickData,
         tickUpper,
         tickCurrent,
         liquidityDelta,
@@ -248,7 +247,7 @@ export class Pool extends ChainObject {
 
     //calculate fee growth inside the range
     const [feeGrowthInside0, feeGrowthInside1] = getFeeGrowthInside(
-      this.tickData,
+      tickData,
       tickLower,
       tickUpper,
       tickCurrent,
@@ -273,173 +272,20 @@ export class Pool extends ChainObject {
     position: DexPositionData,
     tickLower: number,
     tickUpper: number,
-    liquidity: BigNumber
+    liquidity: BigNumber,
+    tickData: TickDataObj
   ): BigNumber[] {
     if (liquidity.isEqualTo(0)) throw new ValidationFailedError("Invalid Liquidity");
 
-    const [amount0Req, amount1Req] = this._modifyPosition(position, tickLower, tickUpper, liquidity);
+    const [amount0Req, amount1Req] = this._modifyPosition(
+      position,
+      tickLower,
+      tickUpper,
+      liquidity,
+      tickData
+    );
 
     return [amount0Req, amount1Req];
-  }
-
-  /**
-   * @notice Swap token0 for token1, or token1 for token0
-   * @param recipient The address to receive the output of the swap
-   * @param zeroForOne The direction of the swap, true for token0 to token1, false for token1 to token0
-   * @param amountSpecified The amount of the swap, which implicitly configures the swap as exact input (positive), or exact output (negative)
-   * @param sqrtPriceLimit sqrt price limit. If zero for one, the price cannot be less than this value after the swap. If one for zero, the price cannot be greater than this value after the swap
-   * @return amount0 The delta of the balance of token0 of the pool, exact when negative, minimum when positive
-   * @return amount1 The delta of the balance of token1 of the pool, exact when negative, minimum when positive
-   */
-  public swap(
-    zeroForOne: boolean,
-    amountSpecified: BigNumber,
-    sqrtPriceLimit: BigNumber
-  ): [amount0: BigNumber, amount1: BigNumber] {
-    // Input amount to swap
-    if (amountSpecified.isEqualTo(0)) throw new ValidationFailedError("Invalid specified amount");
-    //Check for the validity of sqrtPriceLimit
-    if (zeroForOne) {
-      if (
-        !(
-          sqrtPriceLimit.isLessThan(this.sqrtPrice) &&
-          sqrtPriceLimit.isGreaterThan(new BigNumber("0.000000000000000000054212146"))
-        )
-      )
-        throw new SlippageToleranceExceededError("SquarePriceLImit exceeds limit");
-    } else {
-      if (
-        !(
-          sqrtPriceLimit.isGreaterThan(this.sqrtPrice) &&
-          sqrtPriceLimit.isLessThan(new BigNumber("18446051000000000000"))
-        )
-      )
-        throw new SlippageToleranceExceededError("SquarePriceLImit exceeds limit");
-    }
-
-    const slot0 = {
-      sqrtPrice: new BigNumber(this.sqrtPrice),
-      tick: sqrtPriceToTick(this.sqrtPrice),
-      liquidity: new BigNumber(this.liquidity)
-    };
-
-    const state: SwapState = {
-      amountSpecifiedRemaining: amountSpecified,
-      amountCalculated: new BigNumber(0),
-      sqrtPrice: new BigNumber(this.sqrtPrice),
-      tick: slot0.tick,
-      liquidity: new BigNumber(slot0.liquidity),
-      feeGrowthGlobalX: zeroForOne ? this.feeGrowthGlobal0 : this.feeGrowthGlobal1,
-      protocolFee: new BigNumber(0)
-    };
-
-    const exactInput = amountSpecified.isGreaterThan(0);
-
-    //swap till the amount specified for the swap is completely exhausted
-    while (!state.amountSpecifiedRemaining.isEqualTo(0) && !state.sqrtPrice.isEqualTo(sqrtPriceLimit)) {
-      const step: StepComputations = {
-        sqrtPriceStart: state.sqrtPrice,
-        tickNext: 0,
-        sqrtPriceNext: BigNumber(0),
-        initialised: false,
-        amountOut: BigNumber(0),
-        amountIn: BigNumber(0),
-        feeAmount: BigNumber(0)
-      };
-
-      [step.tickNext, step.initialised] = nextInitialisedTickWithInSameWord(
-        this.bitmap,
-        state.tick,
-        this.tickSpacing,
-        zeroForOne,
-        state.sqrtPrice
-      );
-
-      //cap the tick in valid range i.e. MIN_TICK < tick < MAX_TICK
-      if (step.tickNext < DexPositionData.MIN_TICK || step.tickNext > DexPositionData.MAX_TICK) {
-        throw new ConflictError("Not enough liquidity available in pool");
-      }
-
-      //price at next tick
-      step.sqrtPriceNext = tickToSqrtPrice(step.tickNext);
-      [state.sqrtPrice, step.amountIn, step.amountOut, step.feeAmount] = computeSwapStep(
-        state.sqrtPrice,
-        (
-          zeroForOne
-            ? step.sqrtPriceNext.isLessThan(sqrtPriceLimit)
-            : step.sqrtPriceNext.isGreaterThan(sqrtPriceLimit)
-        )
-          ? sqrtPriceLimit
-          : step.sqrtPriceNext,
-        state.liquidity,
-        state.amountSpecifiedRemaining,
-        this.fee
-      );
-      if (exactInput) {
-        state.amountSpecifiedRemaining = state.amountSpecifiedRemaining.minus(
-          step.amountIn.plus(step.feeAmount)
-        );
-        state.amountCalculated = state.amountCalculated.minus(step.amountOut);
-      } else {
-        state.amountSpecifiedRemaining = state.amountSpecifiedRemaining.plus(step.amountOut);
-        state.amountCalculated = state.amountCalculated.plus(step.amountIn.plus(step.feeAmount));
-      }
-
-      // if protocl fee is on, calculate how much is owed, decrement feeAmount and increment protocolFee
-      if (this.protocolFees > 0) {
-        const delta = step.feeAmount.multipliedBy(new BigNumber(this.protocolFees));
-        step.feeAmount = step.feeAmount.minus(delta);
-        state.protocolFee = state.protocolFee.plus(delta);
-      }
-
-      // Update Global fee tracker
-      if (state.liquidity.isGreaterThan(0))
-        state.feeGrowthGlobalX = state.feeGrowthGlobalX.plus(step.feeAmount.dividedBy(state.liquidity));
-
-      if (state.sqrtPrice == step.sqrtPriceNext) {
-        if (step.initialised) {
-          let liquidityNet = tickCross(
-            step.tickNext,
-            this.tickData,
-            zeroForOne ? state.feeGrowthGlobalX : this.feeGrowthGlobal0,
-            zeroForOne ? this.feeGrowthGlobal1 : state.feeGrowthGlobalX
-          );
-          if (zeroForOne) liquidityNet = liquidityNet.times(-1);
-          state.liquidity = state.liquidity.plus(liquidityNet);
-        }
-        state.tick = zeroForOne ? step.tickNext - 1 : step.tickNext;
-      } else if (state.sqrtPrice != step.sqrtPriceStart) {
-        state.tick = sqrtPriceToTick(state.sqrtPrice);
-      }
-    }
-
-    // update to new price
-    this.sqrtPrice = state.sqrtPrice;
-
-    // Updating global liquidity
-    if (this.liquidity != state.liquidity) this.liquidity = state.liquidity;
-
-    // Update fee growth global
-    if (zeroForOne) {
-      this.feeGrowthGlobal0 = state.feeGrowthGlobalX;
-      if (state.protocolFee.gt(new BigNumber(0)))
-        this.protocolFeesToken0 = this.protocolFeesToken0.plus(state.protocolFee);
-    } else {
-      this.feeGrowthGlobal1 = state.feeGrowthGlobalX;
-      if (state.protocolFee.gt(new BigNumber(0)))
-        this.protocolFeesToken1 = this.protocolFeesToken1.plus(state.protocolFee);
-    }
-
-    const amount0: BigNumber =
-      zeroForOne == exactInput
-        ? new BigNumber(amountSpecified).minus(state.amountSpecifiedRemaining)
-        : state.amountCalculated;
-    const amount1: BigNumber =
-      zeroForOne == exactInput
-        ? new BigNumber(state.amountCalculated)
-        : new BigNumber(amountSpecified).minus(state.amountSpecifiedRemaining);
-
-    return [amount0, amount1];
   }
 
   /**
@@ -457,9 +303,16 @@ export class Pool extends ChainObject {
     position: DexPositionData,
     tickLower: number,
     tickUpper: number,
-    amount: BigNumber
+    amount: BigNumber,
+    tickData: TickDataObj
   ): BigNumber[] {
-    let [amount0, amount1] = this._modifyPosition(position, tickLower, tickUpper, amount.multipliedBy(-1));
+    let [amount0, amount1] = this._modifyPosition(
+      position,
+      tickLower,
+      tickUpper,
+      amount.multipliedBy(-1),
+      tickData
+    );
 
     amount0 = amount0.abs();
     amount1 = amount1.abs();
@@ -549,13 +402,19 @@ export class Pool extends ChainObject {
     tickLower: number,
     tickUpper: number,
     amount0Requested: BigNumber,
-    amount1Requested: BigNumber
+    amount1Requested: BigNumber,
+    tickData: TickDataObj
   ) {
     if (
       new BigNumber(position.tokensOwed0).lt(amount0Requested) ||
       new BigNumber(position.tokensOwed1).lt(amount1Requested)
     ) {
-      const [tokensOwed0, tokensOwed1] = this.getFeeCollectedEstimation(position, tickLower, tickUpper);
+      const [tokensOwed0, tokensOwed1] = this.getFeeCollectedEstimation(
+        position,
+        tickLower,
+        tickUpper,
+        tickData
+      );
       if (tokensOwed0.isGreaterThan(0) || tokensOwed1.isGreaterThan(0)) {
         position.tokensOwed0 = new BigNumber(position.tokensOwed0).plus(tokensOwed0);
         position.tokensOwed1 = new BigNumber(position.tokensOwed1).plus(tokensOwed1);
@@ -580,11 +439,16 @@ export class Pool extends ChainObject {
    * @param tickUpper The upper tick of the position for which to collect fee accumulated
    * @returns
    */
-  public getFeeCollectedEstimation(position: DexPositionData, tickLower: number, tickUpper: number) {
+  public getFeeCollectedEstimation(
+    position: DexPositionData,
+    tickLower: number,
+    tickUpper: number,
+    tickData: TickDataObj
+  ) {
     // Calculate total fees accumulated in given tick range
     const tickCurrent = sqrtPriceToTick(this.sqrtPrice);
     const [feeGrowthInside0, feeGrowthInside1] = getFeeGrowthInside(
-      this.tickData,
+      tickData,
       tickLower,
       tickUpper,
       tickCurrent,
@@ -659,5 +523,41 @@ export class Pool extends ChainObject {
       else amount1Req = getAmount1Delta(sqrtPriceLower, sqrtPriceUpper, liquidityDelta);
     }
     return [amount0Req, amount1Req];
+  }
+
+  public swapN(
+    zeroForOne: boolean,
+    state: SwapState,
+    amountSpecified: BigNumber
+  ): [amount0: BigNumber, amount1: BigNumber] {
+    const exactInput = amountSpecified.isGreaterThan(0);
+
+    // update to new price
+    this.sqrtPrice = state.sqrtPrice;
+
+    // Updating global liquidity
+    if (this.liquidity != state.liquidity) this.liquidity = state.liquidity;
+
+    // Update fee growth global
+    if (zeroForOne) {
+      this.feeGrowthGlobal0 = state.feeGrowthGlobalX;
+      if (state.protocolFee.gt(new BigNumber(0)))
+        this.protocolFeesToken0 = this.protocolFeesToken0.plus(state.protocolFee);
+    } else {
+      this.feeGrowthGlobal1 = state.feeGrowthGlobalX;
+      if (state.protocolFee.gt(new BigNumber(0)))
+        this.protocolFeesToken1 = this.protocolFeesToken1.plus(state.protocolFee);
+    }
+
+    const amount0: BigNumber =
+      zeroForOne == exactInput
+        ? new BigNumber(amountSpecified).minus(state.amountSpecifiedRemaining)
+        : state.amountCalculated;
+    const amount1: BigNumber =
+      zeroForOne == exactInput
+        ? new BigNumber(state.amountCalculated)
+        : new BigNumber(amountSpecified).minus(state.amountSpecifiedRemaining);
+
+    return [amount0, amount1];
   }
 }

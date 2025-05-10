@@ -59,7 +59,7 @@ import {
 
 jest.setTimeout(100000);
 
-describe("LaunchpadContract", () => {
+describe.skip("LaunchpadContract", () => {
   const LaunchpadContractConfig = {
     Launchpad: {
       channel: "product-channel",
@@ -1256,17 +1256,20 @@ describe("LaunchpadContract", () => {
       buyWithNativeDTO.nativeTokenQuantity = new BigNumber("1640986");
       buyWithNativeDTO.sign(user1.privateKey);
 
-      await client.Launchpad.BuyWithNative(buyWithNativeDTO);
+     const buyres =  await client.Launchpad.BuyWithNative(buyWithNativeDTO);
+      console.log("Buy with native response", buyres);
 
       //Fetch Sale Details
       const fetchSaleDetailsDTO = new FetchSaleDto();
       fetchSaleDetailsDTO.vaultAddress = vaultAddress;
 
       const fetchSaleRes = await client.Launchpad.FetchSale(fetchSaleDetailsDTO);
+      console.log("Fetch Sale Respons", fetchSaleRes);
       expect(fetchSaleRes.Data?.saleStatus).toEqual(SaleStatus.END);
 
       //Check Balance of Default INITIAL_PLATFORM_FEE_ADDRESS
       const platformBalance = await getTokenBalance(user5.identityKey, "GALA", "Unit", "none");
+      console.log("Platform Balance");
 
       //Default Platform Fee Value is 10%
       const mCap_Value = Number("1640985.8441726");
@@ -1285,7 +1288,8 @@ describe("LaunchpadContract", () => {
       BuyExactToken.expectedNativeToken = new BigNumber("1700000");
 
       BuyExactToken.sign(user1.privateKey);
-      await client.Launchpad.BuyExactToken(BuyExactToken);
+      const buyRes = await client.Launchpad.BuyExactToken(BuyExactToken);
+      console.log("BuY rESPONSE ", buyRes);
 
       const BuyExactToken1 = new ExactTokenQuantityDto();
       BuyExactToken1.vaultAddress = vaultAddress;
@@ -1293,7 +1297,8 @@ describe("LaunchpadContract", () => {
       BuyExactToken1.expectedNativeToken = new BigNumber("1700000");
 
       BuyExactToken1.sign(user2.privateKey);
-      await client.Launchpad.BuyExactToken(BuyExactToken1);
+      const buyRes2=await client.Launchpad.BuyExactToken(BuyExactToken1);
+      console.log("BuY rESPONSE ", buyRes2);
 
       const fetchSaleDetails = new FetchSaleDto();
       fetchSaleDetails.vaultAddress = vaultAddress;

@@ -42,7 +42,7 @@ export async function fetchUserPositionInTickRange(
   const userPositions = await getObjectByKey(ctx, DexPositionOwner, positionOwnerCompositeKey);
 
   // Check if user holds any position for this tick range
-  const positionId = userPositions.getPositionId(tickRange);
+  const positionId = userPositions.getPositionIds(tickRange);
   if (!positionId) {
     throw new NotFoundError(`User doesnt holds any position for the tick range ${tickRange} in this pool.`);
   }

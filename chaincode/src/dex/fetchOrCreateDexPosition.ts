@@ -29,6 +29,42 @@ import { genTickRange, getDexPosition, getObjectByKey, putChainObject } from "..
  * @param owner - (Optional) The user address; defaults to the calling user
  * @returns The DexPositionData object representing the user's position
  */
+// export async function fetchOrCreateDexPosition(
+//   ctx: GalaChainContext,
+//   poolHash: string,
+//   tickUpper: number,
+//   tickLower: number,
+//   owner?: string
+// ): Promise<DexPositionData> {
+//   const user = owner ?? ctx.callingUser;
+//   const tickRange = genTickRange(tickLower, tickUpper);
+//   const emptyUserPosition = new DexPositionOwner(user, poolHash);
+
+//   // Fetch or initialize user's DEX position owner record
+//   const fetchedUserPosition = await getObjectByKey(
+//     ctx,
+//     DexPositionOwner,
+//     emptyUserPosition.getCompositeKey()
+//   ).catch((e) => ChainError.ignore(e, ErrorCode.NOT_FOUND, emptyUserPosition));
+
+//   await fetchedUserPosition.validateOrReject();
+
+//   // Check if position already exists for the tick range and create a new one if it doesn't
+//   let positionId = fetchedUserPosition.getPositionId(tickRange);
+//   if (!positionId) {
+//     const hashingString = `${user},${poolHash},${tickRange},${ctx.txUnixTime}`;
+//     positionId = keccak256(hashingString);
+//     fetchedUserPosition.addPosition(tickRange, positionId);
+//     await putChainObject(ctx, fetchedUserPosition);
+
+//     return new DexPositionData(poolHash, positionId, tickUpper, tickLower);
+//   }
+
+//   // Fetch and return existing position data
+//   return getDexPosition(ctx, poolHash, tickUpper, tickLower, positionId);
+// }
+
+
 export async function fetchOrCreateDexPosition(
   ctx: GalaChainContext,
   poolHash: string,
@@ -50,7 +86,8 @@ export async function fetchOrCreateDexPosition(
   await fetchedUserPosition.validateOrReject();
 
   // Check if position already exists for the tick range and create a new one if it doesn't
-  let positionId = fetchedUserPosition.getPositionId(tickRange);
+  let positionId = fetchedUserPosition.getPositionIds(tickRange);
+  
   if (!positionId) {
     const hashingString = `${user},${poolHash},${tickRange},${ctx.txUnixTime}`;
     positionId = keccak256(hashingString);

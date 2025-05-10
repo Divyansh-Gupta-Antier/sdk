@@ -123,7 +123,7 @@ export class PositionDto extends ChainCallDTO {
     tickLower: number,
     tickUpper: number,
     liquidity: BigNumber,
-    owner?: string,
+    owner?: string
   ) {
     super();
     this.token0 = token0;
@@ -832,7 +832,11 @@ export class BurnEstimateDto extends ChainCallDTO {
   }
 }
 
-export class GetPositionWithNftIdDto extends ChainCallDTO {
+export class TransferPositionDTO extends ChainCallDTO {
+  @IsNotEmpty()
+
+  public toAddress: string;
+
   @IsNotEmpty()
   @ValidateNested()
   @Type(() => TokenClassKey)
@@ -844,26 +848,42 @@ export class GetPositionWithNftIdDto extends ChainCallDTO {
   public token1: TokenClassKey;
 
   @IsNotEmpty()
-  @IsNumber()
-  public fee: number;
+  @IsInt()
+  @Max(MAX_TICK)
+  public tickUpper: number;
 
   @IsNotEmpty()
-  @IsString()
-  public nftId: string;
+  @IsInt()
+  @Min(MIN_TICK)
+  @IsLessThan("tickUpper")
+  public tickLower: number;
 
-  constructor(token0: TokenClassKey, token1: TokenClassKey, fee: number, nftId: string) {
-    super();
-    this.token0 = token0;
-    this.token1 = token1;
-    this.fee = fee;
-    this.nftId = nftId;
-  }
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
 }
 
-export class DexNftBatchLimitDto extends ChainCallDTO {
-  @BigNumberProperty()
-  @BigNumberIsPositive()
-  @BigNumberIsInteger()
-  @IsNonZeroBigNumber()
-  newMaxSupply: BigNumber;
+export class  TransferPositionIdDTO extends ChainCallDTO{
+  @IsNotEmpty()
+
+  public toAddress: string;
+
+  @IsNotEmpty()
+  @ValidateNested()
+  @Type(() => TokenClassKey)
+  public token0: TokenClassKey;
+
+  @IsNotEmpty()
+  @ValidateNested()
+  @Type(() => TokenClassKey)
+  public token1: TokenClassKey;
+
+
+  @EnumProperty(DexFeePercentageTypes)
+  public fee: DexFeePercentageTypes;
+
+  @IsNotEmpty()
+  public positionId : string  ;
+
+
+
 }

@@ -16,6 +16,7 @@ import { BurnEstimateDto, GetRemoveLiqEstimationResDto, NotFoundError, Pool } fr
 
 import { GalaChainContext } from "../types";
 import { getObjectByKey, validateTokenOrder } from "../utils";
+import { getOrDefautTickDataPair } from "./../utils/dexUtils";
 import { fetchUserPositionInTickRange } from "./fetchUserPositionInTickRange";
 
 /**
@@ -33,6 +34,7 @@ export async function getRemoveLiquidityEstimation(
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key);
 
+  const poolHash = pool.genPoolHash();
   const position = await fetchUserPositionInTickRange(
     ctx,
     pool.genPoolHash(),
@@ -44,7 +46,8 @@ export async function getRemoveLiquidityEstimation(
   const tickLower = parseInt(dto.tickLower.toString()),
     tickUpper = parseInt(dto.tickUpper.toString());
 
-  const amounts = pool.burn(position, tickLower, tickUpper, dto.amount.f18());
+  const tickData = await getOrDefautTickDataPair(ctx, poolHash, tickLower, tickUpper);
+  const amounts = pool.burn(position, tickLower, tickUpper, dto.amount.f18(), tickData);
 
   return new GetRemoveLiqEstimationResDto(amounts[0], amounts[1]);
 }

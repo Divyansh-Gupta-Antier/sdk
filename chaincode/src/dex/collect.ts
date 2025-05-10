@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) Gala Games Inc. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CollectDto, NotFoundError, Pool, UserBalanceResDto } from "@gala-chain/api";
+import { CollectDto, NotFoundError, Pool, UserBalanceResDto  } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { fetchOrCreateBalance } from "../balances";
@@ -27,6 +28,7 @@ import {
 } from "../utils";
 import { fetchUserPositionInTickRange } from "./fetchUserPositionInTickRange";
 import { removeInactivePosition } from "./removeInactivePosition";
+import { getOrDefautTickDataPair } from "../utils";
 
 /**
  * @dev The collect function allows a user to claim and withdraw accrued fee tokens from a specific liquidity position in a Decentralized exchange pool within the GalaChain ecosystem. It retrieves earned fees based on the user's position details and transfers them to the user's account.
@@ -70,7 +72,9 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
   const tickLower = parseInt(dto.tickLower.toString()),
     tickUpper = parseInt(dto.tickUpper.toString());
 
-  const amounts = pool.collect(position, tickLower, tickUpper, amount0Requested, amount1Requested);
+  const tickData = await getOrDefautTickDataPair(ctx,poolHash,tickLower,tickUpper);
+
+  const amounts = pool.collect(position, tickLower, tickUpper, amount0Requested, amount1Requested,tickData );
 
   await removeInactivePosition(ctx, poolHash, position);
   await putChainObject(ctx, pool);

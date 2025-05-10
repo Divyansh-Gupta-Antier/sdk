@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) Gala Games Inc. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,6 +30,7 @@ import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
 import { convertToTokenInstanceKey, getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
 import { fetchOrCreateDexPosition } from "./fetchOrCreateDexPosition";
+import { getOrDefautTickDataPair } from './../utils/dexUtils';
 
 /**
  * @dev Function to add Liqudity to v3 pool. The addLiquidity function facilitates the addition of liquidity to a Decentralized exchange pool within the GalaChain ecosystem. It takes in the blockchain context, liquidity parameters, and an optional launchpad address, then executes the necessary operations to deposit assets into the specified liquidity pool.
@@ -81,7 +83,9 @@ export async function addLiquidity(
   const poolAlias = pool.getPoolAlias();
   const position = await fetchOrCreateDexPosition(ctx, poolHash, tickUpper, tickLower);
 
-  let [amount0, amount1] = pool.mint(position, tickLower, tickUpper, liquidity.f18());
+  const tickData = await getOrDefautTickDataPair(ctx,poolHash,tickLower,tickUpper);
+
+  let [amount0, amount1] = pool.mint(position, tickLower, tickUpper, liquidity.f18(), tickData);
 
   if (amount0.lt(amount0Min) || amount1.lt(amount1Min)) {
     throw new SlippageToleranceExceededError(
@@ -117,9 +121,12 @@ export async function addLiquidity(
       }
     });
   }
-
-  await putChainObject(ctx, position);
+ 
   await putChainObject(ctx, pool);
+  await putChainObject(ctx, position);
+  await putChainObject(ctx,tickData[tickUpper]);
+  await putChainObject(ctx,tickData[tickLower]);
+  
 
   const liquidityProviderToken0Balance = await fetchOrCreateBalance(ctx, ctx.callingUser, token0InstanceKey);
   const liquidityProviderToken1Balance = await fetchOrCreateBalance(ctx, ctx.callingUser, token1InstanceKey);
