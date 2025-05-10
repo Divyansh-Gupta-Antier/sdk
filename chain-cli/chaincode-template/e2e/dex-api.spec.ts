@@ -18,6 +18,7 @@ import {
   BurnDto,
   BurnEstimateDto,
   ChainCallDTO,
+  ChainObject,
   CollectDto,
   CollectTradingFeesDto,
   CollectTradingFeesResDto,
@@ -50,10 +51,12 @@ import {
   SwapResDto,
   TokenAllowance,
   TokenBalance,
+  TokenClass,
   TokenClassKey,
   TokenInstanceKey,
   TransferTokenDto,
   UserBalanceResDto,
+  createValidDTO,
   feeAmountTickSpacing,
   sqrtPriceToTick
 } from "@gala-chain/api";
@@ -514,27 +517,27 @@ describe("DEx v3 Testing", () => {
         Status: 1,
         Data: {
           userBalanceDelta: {
-            token0Balance: expect.objectContaining({
+            token0Balance: {
               additionalKey: "ETH",
               category: "new-category0",
               collection: "new-collection0",
               inUseHolds: [],
               instanceIds: [],
               lockedHolds: [],
-              owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
-              quantity: "100000000",
+              owner: user.identityKey,
+              quantity: new BigNumber("100000000"),
               type: "new-type0"
-            }),
-            token1Balance: expect.objectContaining({
+            },
+            token1Balance: {
               additionalKey: "USDT",
               category: "new-category0",
               collection: "new-collection0",
               inUseHolds: [],
               instanceIds: [],
               lockedHolds: [],
-              owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+              owner: user.identityKey,
               type: "new-type0"
-            })
+            }
           },
           amounts: [new BigNumber("0"), new BigNumber("0.999999999999999998")]
         }
@@ -878,28 +881,28 @@ describe("DEx v3 Testing", () => {
       expect(burnRes).toMatchObject({
         Status: 1,
         Data: {
-          token0Balance: expect.objectContaining({
+          token0Balance: {
             additionalKey: "ETH",
             category: "new-category0",
             collection: "new-collection0",
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
-            quantity: "99999998",
+            owner: user.identityKey,
+            quantity: new BigNumber("99999998.999"),
             type: "new-type0"
-          }),
-          token1Balance: expect.objectContaining({
+          },
+          token1Balance: {
             additionalKey: "USDT",
             category: "new-category0",
             collection: "new-collection0",
-            quantity: "99996004.869665533956529657",
+            quantity: new BigNumber("99999999.000000000000000004"),
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+            owner: user.identityKey,
             type: "new-type0"
-          })
+          }
         }
       });
 
@@ -1039,7 +1042,7 @@ describe("DEx v3 Testing", () => {
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+            owner: user.identityKey,
             type: "new-type0"
           }),
           token1Balance: expect.objectContaining({
@@ -1049,7 +1052,7 @@ describe("DEx v3 Testing", () => {
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+            owner: user.identityKey,
             type: "new-type0"
           })
         }
@@ -1343,7 +1346,7 @@ describe("DEx v3 Testing", () => {
               inUseHolds: [],
               instanceIds: [],
               lockedHolds: [],
-              owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+              owner: user.identityKey,
               type: "new-type0"
             }),
             token1Balance: expect.objectContaining({
@@ -1353,7 +1356,7 @@ describe("DEx v3 Testing", () => {
               inUseHolds: [],
               instanceIds: [],
               lockedHolds: [],
-              owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+              owner: user.identityKey,
               type: "new-type0"
             })
           },
@@ -1513,7 +1516,7 @@ describe("DEx v3 Testing", () => {
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+            owner: user.identityKey,
             type: "new-type0"
           }),
           token1Balance: expect.objectContaining({
@@ -1523,7 +1526,7 @@ describe("DEx v3 Testing", () => {
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+            owner: user.identityKey,
             type: "new-type0"
           })
         }
@@ -1942,7 +1945,7 @@ describe("DEx v3 Testing", () => {
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+            owner: user.identityKey,
             type: "new-type0"
           }),
           token1Balance: expect.objectContaining({
@@ -1952,7 +1955,7 @@ describe("DEx v3 Testing", () => {
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
+            owner: user.identityKey,
             type: "new-type0"
           })
         }
@@ -2091,8 +2094,8 @@ describe("DEx v3 Testing", () => {
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
-            quantity: "99999898.99930000000000062",
+            owner: user.identityKey,
+            quantity: new BigNumber("99999898.99930000000000062"),
             type: "new-type0"
           },
           token1Balance: {
@@ -2102,8 +2105,8 @@ describe("DEx v3 Testing", () => {
             inUseHolds: [],
             instanceIds: [],
             lockedHolds: [],
-            owner: expect.stringMatching(/^eth\|[a-fA-F0-9]{40}$/),
-            quantity: "99852543.846247174107773938",
+            owner: user.identityKey,
+            quantity: new BigNumber("99856936.643320146052266951"),
             type: "new-type0"
           }
         }

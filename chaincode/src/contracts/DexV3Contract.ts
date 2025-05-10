@@ -34,6 +34,7 @@ import {
   GetUserPositionsDto,
   NotFoundError,
   Pool,
+  PositionData,
   QuoteExactAmountDto,
   QuoteExactAmountResDto,
   SetProtocolFeeDto,
@@ -139,8 +140,8 @@ export class DexV3Contract extends GalaContract {
     in: GetPositionDto,
     out: DexPositionData
   })
-  public async GetPositions(ctx: GalaChainContext, dto: GetPositionDto): Promise<DexPositionData> {
-    return await getPosition(ctx, dto);
+  public async GetPositions(ctx: GalaChainContext, dto: GetPositionDto): Promise<PositionData> {
+    return await getPositions(ctx, dto);
   }
 
   //ToDo: Update the outputs

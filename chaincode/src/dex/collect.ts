@@ -103,7 +103,7 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
       }
     });
   }
-  
+
   const liquidityProviderToken0Balance = await fetchOrCreateBalance(
     ctx,
     ctx.callingUser,

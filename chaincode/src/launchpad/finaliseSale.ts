@@ -91,12 +91,13 @@ export async function finalizeSale(ctx: GalaChainContext, sale: LaunchpadSale): 
   );
 
   const { sqrtPrice, finalPrice } = calculateFinalLaunchpadPrice(sale, areTokensSorted);
-  const poolDTO = plainToInstance(CreatePoolDto, {
-    token0: areTokensSorted ? nativeTokenClassKey : sellingTokenClassKey,
-    token1: areTokensSorted ? sellingTokenClassKey : nativeTokenClassKey,
-    fee: 3000,
-    initialSqrtPrice: sqrtPrice
-  });
+  const poolDTO = new CreatePoolDto(
+    areTokensSorted ? nativeTokenClassKey : sellingTokenClassKey,
+    areTokensSorted ? sellingTokenClassKey : nativeTokenClassKey,
+    3000,
+    sqrtPrice
+  );
+
   // Check if a pool for this token already exists
   let pool = await getPoolData(ctx, poolDTO);
   if (!pool) {
