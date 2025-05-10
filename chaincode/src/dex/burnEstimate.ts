@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { BurnEstimateDto, GetRemoveLiqEstimationResDto, NotFoundError, Pool } from "@gala-chain/api";
+import { BurnEstimateDto, GetRemoveLiqEstimationResDto, Pool } from "@gala-chain/api";
 
 import { GalaChainContext } from "../types";
 import { getObjectByKey, validateTokenOrder } from "../utils";

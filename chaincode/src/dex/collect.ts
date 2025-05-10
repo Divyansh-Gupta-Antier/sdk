@@ -16,17 +16,19 @@ import { CollectDto, NotFoundError, Pool, UserBalanceResDto } from "@gala-chain/
 import BigNumber from "bignumber.js";
 
 import { fetchOrCreateBalance } from "../balances";
-import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
 import {
   convertToTokenInstanceKey,
   getObjectByKey,
+  getTokenDecimalsFromPool,
   putChainObject,
+  roundTokenAmount,
   validateTokenOrder
 } from "../utils";
+import { NegativeAmountError } from "./dexError";
 import { fetchUserPositionInTickRange } from "./fetchUserPositionInTickRange";
-import { removeInactivePosition } from "./removeInactivePosition";
+import { removePositionIfEmpty } from "./removePositionIfEmpty";
 
 /**
  * @dev The collect function allows a user to claim and withdraw accrued fee tokens from a specific liquidity position in a Decentralized exchange pool within the GalaChain ecosystem. It retrieves earned fees based on the user's position details and transfers them to the user's account.
@@ -48,8 +50,8 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
   //create tokenInstanceKeys
   const tokenInstanceKeys = [pool.token0ClassKey, pool.token1ClassKey].map(convertToTokenInstanceKey);
 
-  //fetch token classes
-  const tokenClasses = await Promise.all(tokenInstanceKeys.map((key) => fetchTokenClass(ctx, key)));
+  //fetch token decimals
+  const tokenDecimals = await getTokenDecimalsFromPool(ctx, pool);
 
   const poolToken0Balance = await fetchOrCreateBalance(
     ctx,
@@ -72,34 +74,36 @@ export async function collect(ctx: GalaChainContext, dto: CollectDto): Promise<U
 
   const amounts = pool.collect(position, tickLower, tickUpper, amount0Requested, amount1Requested);
 
-  await removeInactivePosition(ctx, poolHash, position);
+  await removePositionIfEmpty(ctx, poolHash, position);
   await putChainObject(ctx, pool);
 
   for (const [index, amount] of amounts.entries()) {
-    if (amount.gt(0)) {
-      const poolTokenBalance = await fetchOrCreateBalance(
-        ctx,
-        poolAlias,
-        tokenInstanceKeys[index].getTokenClassKey()
-      );
-      const roundedAmount = BigNumber.min(
-        new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs(),
-        poolTokenBalance.getQuantityTotal()
-      );
-
-      await transferToken(ctx, {
-        from: poolAlias,
-        to: ctx.callingUser,
-        tokenInstanceKey: tokenInstanceKeys[index],
-        quantity: new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs(),
-        allowancesToUse: [],
-        authorizedOnBehalf: {
-          callingOnBehalf: poolAlias,
-          callingUser: poolAlias
-        }
-      });
+    if (amount.lt(0)) {
+      throw new NegativeAmountError(index, amount.toString());
     }
+    const poolTokenBalance = await fetchOrCreateBalance(
+      ctx,
+      poolAlias,
+      tokenInstanceKeys[index].getTokenClassKey()
+    );
+    const roundedAmount = BigNumber.min(
+      roundTokenAmount(amount, tokenDecimals[index]),
+      poolTokenBalance.getQuantityTotal()
+    );
+
+    await transferToken(ctx, {
+      from: poolAlias,
+      to: ctx.callingUser,
+      tokenInstanceKey: tokenInstanceKeys[index],
+      quantity: roundedAmount,
+      allowancesToUse: [],
+      authorizedOnBehalf: {
+        callingOnBehalf: poolAlias,
+        callingUser: poolAlias
+      }
+    });
   }
+  
   const liquidityProviderToken0Balance = await fetchOrCreateBalance(
     ctx,
     ctx.callingUser,

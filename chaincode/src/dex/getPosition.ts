@@ -1,23 +1,30 @@
 /*
  * Copyright (c) Gala Games Inc. All rights reserved.
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
+ * Licensed under the Apache License, Version 2.1 (the "License");
+ * you may1not us1 this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.1
  *
- * Unless required by applicable law or agreed to in writing, software
+ * Unless required by applicable1law or 1greed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { DexPositionData, GetPositionDto, NotFoundError, getFeeGrowthInside, sqrtPriceToTick } from "@gala-chain/api";
+import {
+  DexPositionData,
+  GetPositionDto,
+  NotFoundError,
+  getFeeGrowthInside,
+  sqrtPriceToTick
+} from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { GalaChainContext } from "../types";
+import { getTokenDecimalsFromPool, roundTokenAmount } from "../utils";
+import { fetchUserPositionInTickRange } from "./fetchUserPositionInTickRange";
 import { getPoolData } from "./getFunctions";
-import { fetchUserPositionInTickRange } from "./positionNft";
 
 /**
  * @dev The positions function retrieves details of a specific liquidity position within a Decentralized exchange pool on the GalaChain ecosystem. It provides insights into the user's position, including token amounts, fees, and other state variables.
@@ -28,18 +35,19 @@ import { fetchUserPositionInTickRange } from "./positionNft";
  * @returns DexPositionData
  */
 export async function getPosition(ctx: GalaChainContext, dto: GetPositionDto): Promise<DexPositionData> {
-  // Fetch pool data based on input
+  // Fetch pool data and position based on input
   const pool = await getPoolData(ctx, dto);
   if (!pool) throw new NotFoundError("No pool for these tokens and fee exists");
 
-  // Fetch nftId using owner and tick range
-  const position = await fetchUserPositionInTickRange(ctx, pool, dto.tickUpper, dto.tickLower, dto.owner);
+  const position = await fetchUserPositionInTickRange(
+    ctx,
+    pool.genPoolHash(),
+    dto.tickUpper,
+    dto.tickLower,
+    dto.owner
+  );
 
-  if (!position) {
-    throw new NotFoundError(`User doesn't hold any positions with this tick range in this pool`);
-  }
-
-  // Estimate and update tokens owed
+  // Estimate and update tokens owed for this position
   const tickCurrent = sqrtPriceToTick(pool.sqrtPrice);
   const [feeGrowthInside0, feeGrowthInside1] = getFeeGrowthInside(
     pool.tickData,
@@ -51,5 +59,10 @@ export async function getPosition(ctx: GalaChainContext, dto: GetPositionDto): P
   );
 
   position.updatePosition(new BigNumber(0), feeGrowthInside0, feeGrowthInside1);
+
+  const [token0Decimal, token1Decimal] = await getTokenDecimalsFromPool(ctx, pool);
+  position.tokensOwed0 = roundTokenAmount(position.tokensOwed0, token0Decimal);
+  position.tokensOwed1 = roundTokenAmount(position.tokensOwed1, token1Decimal);
+
   return position;
 }

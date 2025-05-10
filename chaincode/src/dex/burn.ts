@@ -17,6 +17,7 @@ import {
   NotFoundError,
   Pool,
   SlippageToleranceExceededError,
+  TokenInstanceKey,
   UserBalanceResDto,
   liquidity0,
   liquidity1,
@@ -25,12 +26,18 @@ import {
 import BigNumber from "bignumber.js";
 
 import { fetchOrCreateBalance } from "../balances";
-import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
-import { convertToTokenInstanceKey, getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
+import {
+  getObjectByKey,
+  getTokenDecimalsFromPool,
+  putChainObject,
+  roundTokenAmount,
+  validateTokenOrder
+} from "../utils";
+import { NegativeAmountError } from "./dexError";
 import { fetchUserPositionInTickRange } from "./fetchUserPositionInTickRange";
-import { removeInactivePosition } from "./removeInactivePosition";
+import { removePositionIfEmpty } from "./removePositionIfEmpty";
 
 /**
  * @dev The burn function is responsible for removing liquidity from a Decentralized exchange pool within the GalaChain ecosystem. It executes the necessary operations to burn the liquidity position and transfer the corresponding tokens back to the user.
@@ -39,6 +46,7 @@ import { removeInactivePosition } from "./removeInactivePosition";
  * @returns UserBalanceResDto
  */
 export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<UserBalanceResDto> {
+  // Fetch pool and user position
   const [token0, token1] = validateTokenOrder(dto.token0, dto.token1);
 
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
@@ -53,86 +61,88 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<UserBal
   const tickLower = parseInt(dto.tickLower.toString()),
     tickUpper = parseInt(dto.tickUpper.toString());
 
-  const amounts = pool.burn(position, tickLower, tickUpper, dto.amount.f18());
-  if (amounts[0].lt(dto.amount0Min) || amounts[1].lt(dto.amount1Min)) {
-    throw new SlippageToleranceExceededError(
-      `Slippage check failed: amount0: ${dto.amount0Min.toString()} <= ${amounts[0].toString()}, amount1: ${dto.amount1Min.toString()} <= ${amounts[1].toString()}`
-    );
-  }
+  //Create tokenInstanceKeys
+  const tokenInstanceKeys = [pool.token0ClassKey, pool.token1ClassKey].map(TokenInstanceKey.fungibleKey);
+  const tokenDecimals = await getTokenDecimalsFromPool(ctx, pool);
 
-  //create tokenInstanceKeys
-  const tokenInstanceKeys = [pool.token0ClassKey, pool.token1ClassKey].map(convertToTokenInstanceKey);
-
-  //fetch token classes
-  const tokenClasses = await Promise.all(tokenInstanceKeys.map((key) => fetchTokenClass(ctx, key)));
+  // Estimate how much liquidity can actually be burned based on current pool balances and prices
   let amountToBurn = dto.amount.f18();
   const amountsEstimated = pool.burnEstimate(amountToBurn, tickLower, tickUpper);
   const sqrtPriceA = tickToSqrtPrice(tickLower),
     sqrtPriceB = tickToSqrtPrice(tickUpper);
   const sqrtPrice = pool.sqrtPrice;
 
+  // Adjust burn amount if pool lacks sufficient liquidity
   for (const [index, amount] of amountsEstimated.entries()) {
-    if (amount.gt(0)) {
-      const poolTokenBalance = await fetchOrCreateBalance(
-        ctx,
-        poolAlias,
-        tokenInstanceKeys[index].getTokenClassKey()
-      );
-      const roundedAmount = BigNumber.min(
-        new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs(),
-        poolTokenBalance.getQuantityTotal()
-      );
+    if (amount.lt(0)) {
+      throw new NegativeAmountError(index, amount.toString());
+    }
 
-      // Check whether pool has enough liquidity to perform this operation and adjust accordingly
-      if (!roundedAmount.eq(new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs())) {
-        let maximumBurnableLiquidity: BigNumber;
-        if (index === 0) {
-          maximumBurnableLiquidity = liquidity0(
-            roundedAmount,
-            sqrtPrice.gt(sqrtPriceA) ? sqrtPrice : sqrtPriceA,
-            sqrtPriceB
-          );
-        } else {
-          maximumBurnableLiquidity = liquidity1(
-            roundedAmount,
-            sqrtPriceA,
-            sqrtPrice.lt(sqrtPriceB) ? sqrtPrice : sqrtPriceB
-          );
-        }
-        amountToBurn = BigNumber.min(amountToBurn, maximumBurnableLiquidity);
+    const poolTokenBalance = await fetchOrCreateBalance(ctx, poolAlias, tokenInstanceKeys[index]);
+    const roundedAmount = roundTokenAmount(amount, tokenDecimals[index]);
+
+    if (!roundedAmount.isGreaterThan(poolTokenBalance.getQuantityTotal())) {
+      let maximumBurnableLiquidity: BigNumber;
+      if (index === 0) {
+        maximumBurnableLiquidity = liquidity0(
+          roundedAmount,
+          sqrtPrice.gt(sqrtPriceA) ? sqrtPrice : sqrtPriceA,
+          sqrtPriceB
+        );
+      } else {
+        maximumBurnableLiquidity = liquidity1(
+          roundedAmount,
+          sqrtPriceA,
+          sqrtPrice.lt(sqrtPriceB) ? sqrtPrice : sqrtPriceB
+        );
       }
+      amountToBurn = BigNumber.min(amountToBurn, maximumBurnableLiquidity);
     }
   }
 
-  await removeInactivePosition(ctx, poolHash, position);
+  // Burn liquidity and verify whether amounts are valid
+  const amounts = pool.burn(position, tickLower, tickUpper, dto.amount.f18());
+  if (amounts[0].lt(dto.amount0Min) || amounts[1].lt(dto.amount1Min)) {
+    throw new SlippageToleranceExceededError(
+      `Slippage tolerance exceeded: expected minimums (amount0 ≥ ${dto.amount0Min.toString()}, amount1 ≥ ${dto.amount1Min.toString()}), but received (amount0 = ${amounts[0].toString()}, amount1 = ${amounts[1].toString()})`
+    );
+  }
+  if (amounts[0].isLessThan(0)) {
+    throw new NegativeAmountError(0, amounts[0].toString());
+  }
+  if (amounts[1].isLessThan(0)) {
+    throw new NegativeAmountError(1, amounts[1].toString());
+  }
 
+  await removePositionIfEmpty(ctx, poolHash, position);
+
+  // Transfer tokens to positon holder
   for (const [index, amount] of amounts.entries()) {
-    if (amount.gt(0)) {
-      const poolTokenBalance = await fetchOrCreateBalance(
-        ctx,
-        poolAlias,
-        tokenInstanceKeys[index].getTokenClassKey()
-      );
-      const roundedAmount = BigNumber.min(
-        new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs(),
-        poolTokenBalance.getQuantityTotal()
-      );
+    const poolTokenBalance = await fetchOrCreateBalance(
+      ctx,
+      poolAlias,
+      tokenInstanceKeys[index].getTokenClassKey()
+    );
+    const roundedAmount = BigNumber.min(
+      roundTokenAmount(amount, tokenDecimals[index]),
+      poolTokenBalance.getQuantityTotal()
+    );
 
-      await transferToken(ctx, {
-        from: poolAlias,
-        to: ctx.callingUser,
-        tokenInstanceKey: tokenInstanceKeys[index],
-        quantity: roundedAmount,
-        allowancesToUse: [],
-        authorizedOnBehalf: {
-          callingOnBehalf: poolAlias,
-          callingUser: poolAlias
-        }
-      });
-    }
+    await transferToken(ctx, {
+      from: poolAlias,
+      to: ctx.callingUser,
+      tokenInstanceKey: tokenInstanceKeys[index],
+      quantity: roundedAmount,
+      allowancesToUse: [],
+      authorizedOnBehalf: {
+        callingOnBehalf: poolAlias,
+        callingUser: poolAlias
+      }
+    });
   }
   await putChainObject(ctx, pool);
 
+  // Return position holder's new token balances
   const liquidityProviderToken0Balance = await fetchOrCreateBalance(
     ctx,
     ctx.callingUser,

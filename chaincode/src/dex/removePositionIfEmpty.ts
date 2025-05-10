@@ -12,11 +12,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { DexPositionData, DexPositionOwner } from "@gala-chain/api";
+import { DexPositionData } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { GalaChainContext } from "../types";
-import { deleteChainObject, genTickRange, getObjectByKey, putChainObject } from "../utils";
+import {
+  deleteChainObject,
+  genTickRange,
+  getUserPositionIds,
+  putChainObject
+} from "../utils";
 
 /**
  * Deletes a user's position in a specific tick range if it has negligible liquidity and tokens owed.
@@ -25,13 +30,13 @@ import { deleteChainObject, genTickRange, getObjectByKey, putChainObject } from 
  * @param poolHash - Identifier for the pool.
  * @param position - The DexPositionData object representing the position to evaluate and possibly delete.
  */
-export async function removeInactivePosition(ctx: GalaChainContext, poolHash: string, position: DexPositionData) {
+export async function removePositionIfEmpty(
+  ctx: GalaChainContext,
+  poolHash: string,
+  position: DexPositionData
+) {
   //  Fetch user positions
-  const positionOwnerCompositeKey = ctx.stub.createCompositeKey(DexPositionOwner.INDEX_KEY, [
-    ctx.callingUser,
-    poolHash
-  ]);
-  const userPositions = await getObjectByKey(ctx, DexPositionOwner, positionOwnerCompositeKey);
+  const userPositions = await getUserPositionIds(ctx, ctx.callingUser, poolHash);
 
   // Check if given position needs to be deleted
   const deleteUserPos =

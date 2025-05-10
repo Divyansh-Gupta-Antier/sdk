@@ -34,13 +34,14 @@ export async function fetchOrCreateDexPosition(
   poolHash: string,
   tickUpper: number,
   tickLower: number,
+  uniqueKey: string,
   owner?: string
 ): Promise<DexPositionData> {
-  const user = owner ?? ctx.callingUser;
+  const positionHolder = owner ?? ctx.callingUser;
   const tickRange = genTickRange(tickLower, tickUpper);
-  const emptyUserPosition = new DexPositionOwner(user, poolHash);
+  const emptyUserPosition = new DexPositionOwner(positionHolder, poolHash);
 
-  // Fetch or initialize user's DEX position owner record
+  // Fetch or initialize positionHolder's DEX position owner record
   const fetchedUserPosition = await getObjectByKey(
     ctx,
     DexPositionOwner,
@@ -52,8 +53,7 @@ export async function fetchOrCreateDexPosition(
   // Check if position already exists for the tick range and create a new one if it doesn't
   let positionId = fetchedUserPosition.getPositionId(tickRange);
   if (!positionId) {
-    const hashingString = `${user},${poolHash},${tickRange},${ctx.txUnixTime}`;
-    positionId = keccak256(hashingString);
+    positionId = keccak256(uniqueKey);
     fetchedUserPosition.addPosition(tickRange, positionId);
     await putChainObject(ctx, fetchedUserPosition);
 

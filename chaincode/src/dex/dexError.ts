@@ -12,16 +12,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import BigNumber from "bignumber.js";
+import { ValidationFailedError } from "@gala-chain/api";
 
-import { ConflictError } from "../error";
+export class NegativeAmountError extends ValidationFailedError {
+  tokenIndex: number;
+  amount: string;
 
-export const requirePosititve = (...params) => {
-  for (const positive of params) {
-    if (positive instanceof BigNumber) {
-      if (positive.lt(new BigNumber(0))) {
-        throw new ConflictError("Uint Out of Bounds error :Uint");
-      }
-    }
+  constructor(tokenIndex: number, amount: string) {
+    const token = tokenIndex === 0 ? "token0" : "token1";
+    super(`Estimated amount for ${token} is negative: ${amount}`);
   }
-};
+}

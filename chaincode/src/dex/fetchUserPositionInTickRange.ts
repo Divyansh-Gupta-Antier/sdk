@@ -12,10 +12,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { DexPositionData, DexPositionOwner, NotFoundError } from "@gala-chain/api";
+import { DexPositionData, NotFoundError } from "@gala-chain/api";
 
 import { GalaChainContext } from "../types";
-import { genTickRange, getDexPosition, getObjectByKey } from "../utils";
+import { genTickRange, getDexPosition, getUserPositionIds } from "../utils";
 
 /**
  * Fetches a user's position within a specific tick range in a Dex pool.
@@ -38,8 +38,7 @@ export async function fetchUserPositionInTickRange(
   // Fetch user positions
   const positionHolder = owner ?? ctx.callingUser;
   const tickRange = genTickRange(tickLower, tickUpper);
-  const positionOwnerCompositeKey = ctx.stub.createCompositeKey(DexPositionOwner.INDEX_KEY, [positionHolder, poolHash]);
-  const userPositions = await getObjectByKey(ctx, DexPositionOwner, positionOwnerCompositeKey);
+  const userPositions = await getUserPositionIds(ctx, positionHolder, poolHash);
 
   // Check if user holds any position for this tick range
   const positionId = userPositions.getPositionId(tickRange);

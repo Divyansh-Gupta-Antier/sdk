@@ -20,12 +20,14 @@ import {
   ErrorCode,
   NotFoundError,
   Pool,
+  TokenClass,
   TokenClassKey,
   TokenInstanceKey,
   ValidationFailedError
 } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
+import { fetchTokenClass } from "../token";
 import { GalaChainContext } from "../types";
 import { getObjectByKey } from "./state";
 
@@ -218,4 +220,32 @@ export async function getUserPositionIds(
 ): Promise<DexPositionOwner> {
   const compositeKey = ctx.stub.createCompositeKey(DexPositionOwner.INDEX_KEY, [positionHolder, poolHash]);
   return getObjectByKey(ctx, DexPositionOwner, compositeKey);
+}
+
+/**
+ * Retrieves the decimals for token0 and token1 from a given pool.
+ *
+ * @param ctx - GalaChain context object.
+ * @param pool - The Pool object containing token class keys.
+ * @returns A Promise resolving to a tuple of [token0Decimals, token1Decimals].
+ */
+export async function getTokenDecimalsFromPool(ctx: GalaChainContext, pool: Pool): Promise<[number, number]> {
+  const token0Key = TokenInstanceKey.fungibleKey(pool.token0ClassKey);
+  const token1Key = TokenInstanceKey.fungibleKey(pool.token1ClassKey);
+
+  const token0Class = await fetchTokenClass(ctx, token0Key);
+  const token1Class = await fetchTokenClass(ctx, token1Key);
+
+  return [token0Class.decimals, token1Class.decimals];
+}
+
+/**
+ * Rounds a raw token amount to the token class's decimal precision.
+ *
+ * @param amount - The token amount as a string or BigNumber.
+ * @param decimals - The number of decimals to round to (from token class).
+ * @returns A BigNumber rounded down to the specified decimals.
+ */
+export function roundTokenAmount(amount: string | BigNumber, decimals: number): BigNumber {
+  return new BigNumber(amount).decimalPlaces(decimals, BigNumber.ROUND_DOWN);
 }

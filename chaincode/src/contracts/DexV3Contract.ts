@@ -24,18 +24,14 @@ import {
   ConfigureDexFeeAddressDto,
   CreatePoolDto,
   DexFeeConfig,
-  DexNftBatchLimit,
-  DexNftBatchLimitDto,
   DexPositionData,
   GetAddLiquidityEstimationDto,
   GetAddLiquidityEstimationResDto,
   GetLiquidityResDto,
   GetPoolDto,
   GetPositionDto,
-  GetPositionWithNftIdDto,
   GetRemoveLiqEstimationResDto,
   GetUserPositionsDto,
-  GetUserPositionsResDto,
   NotFoundError,
   Pool,
   QuoteExactAmountDto,
@@ -61,7 +57,6 @@ import {
   getLiquidity,
   getPoolData,
   getPosition,
-  getPositionWithNftId,
   getRemoveLiquidityEstimation,
   getSlot0,
   getUserPositions,
@@ -69,8 +64,6 @@ import {
   setProtocolFee,
   swap
 } from "../dex";
-import { configureDexNftBatchLimit } from "../dex/configureDexNftBatchLimit";
-import { fetchDexNftBatchLimit } from "../dex/fetchDexNftBatchLimit";
 import {
   addLiquidityFeeGate,
   collectPositionFeesFeeGate,
@@ -150,27 +143,13 @@ export class DexV3Contract extends GalaContract {
     return await getPosition(ctx, dto);
   }
 
+  //ToDo: Update the outputs
   @GalaTransaction({
     type: EVALUATE,
-    in: GetPositionWithNftIdDto,
-    out: DexPositionData
+    in: GetUserPositionsDto
+    // out: GetUserPositionsResDto
   })
-  public async GetPositionWithNftId(
-    ctx: GalaChainContext,
-    dto: GetPositionWithNftIdDto
-  ): Promise<DexPositionData> {
-    return await getPositionWithNftId(ctx, dto);
-  }
-
-  @GalaTransaction({
-    type: EVALUATE,
-    in: GetUserPositionsDto,
-    out: GetUserPositionsResDto
-  })
-  public async GetUserPositions(
-    ctx: GalaChainContext,
-    dto: GetUserPositionsDto
-  ): Promise<GetUserPositionsResDto> {
+  public async GetUserPositions(ctx: GalaChainContext, dto: GetUserPositionsDto): Promise<any> {
     return await getUserPositions(ctx, dto);
   }
 
@@ -272,26 +251,5 @@ export class DexV3Contract extends GalaContract {
     dto: ConfigureDexFeeAddressDto
   ): Promise<DexFeeConfig> {
     return configureDexFeeAddress(ctx, dto);
-  }
-
-  @Submit({
-    in: DexNftBatchLimitDto,
-    out: DexNftBatchLimit,
-    allowedOrgs: ["CuratorOrg"]
-  })
-  public async ConfigureDexNftBatchLimit(
-    ctx: GalaChainContext,
-    dto: DexNftBatchLimitDto
-  ): Promise<DexNftBatchLimit> {
-    return configureDexNftBatchLimit(ctx, dto);
-  }
-
-  @Evaluate({
-    in: ChainCallDTO,
-    out: DexNftBatchLimit,
-    allowedOrgs: ["CuratorOrg"]
-  })
-  public async FetchDexNftBatchLimit(ctx: GalaChainContext, dto: ChainCallDTO): Promise<DexNftBatchLimit> {
-    return fetchDexNftBatchLimit(ctx);
   }
 }

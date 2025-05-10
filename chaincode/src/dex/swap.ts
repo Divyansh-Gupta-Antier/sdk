@@ -19,12 +19,7 @@ import { fetchOrCreateBalance } from "../balances";
 import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
-import {
-  convertToTokenInstanceKey,
-  getObjectByKey,
-  putChainObject,
-  validateTokenOrder,
-} from "../utils";
+import { convertToTokenInstanceKey, getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
 
 /**
  * @dev The swap function executes a token swap in a Decentralized exchange pool within the GalaChain ecosystem.
@@ -60,7 +55,9 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
   for (const [index, amount] of amounts.entries()) {
     if (amount.gt(0)) {
       if (dto.amountInMaximum && amount.gt(dto.amountInMaximum)) {
-        throw new SlippageToleranceExceededError("Slippage exceeded");
+        throw new SlippageToleranceExceededError(
+          `Slippage tolerance exceeded: maximum allowed tokens (${dto.amountInMaximum}) is less than required amount (${amount}).`
+        );
       }
 
       await transferToken(ctx, {
@@ -74,7 +71,9 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
     }
     if (amount.lt(0)) {
       if (dto.amountOutMinimum && amount.gt(dto.amountOutMinimum)) {
-        throw new SlippageToleranceExceededError("Slippage exceeded");
+        throw new SlippageToleranceExceededError(
+          `Slippage tolerance exceeded: minimum received tokens (${dto.amountInMaximum}) is less than actual received amount (${amount}).`
+        );
       }
 
       const poolTokenBalance = await fetchOrCreateBalance(

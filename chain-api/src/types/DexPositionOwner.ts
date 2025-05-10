@@ -17,15 +17,15 @@ import { IsNotEmpty, IsString } from "class-validator";
 import { JSONSchema } from "class-validator-jsonschema";
 
 import { ChainKey } from "../utils";
-import { IsUserAlias } from "../validators";
+import { IsStringRecord, IsUserAlias } from "../validators";
 import { ChainObject } from "./ChainObject";
 
 @JSONSchema({
-    description:
-      `Represents a position owned by a user in a decentralized exchange (DEX) pool.` +
-      `Each position is linked to a specific pool, defined by tick range mappings, and associated with a unique position ID.` +
-      `The position also includes ownership details and the pool's unique identifier.`
-  })
+  description:
+    `Represents a position owned by a user in a decentralized exchange (DEX) pool.` +
+    `Each position is linked to a specific pool, defined by tick range mappings, and associated with a unique position ID.` +
+    `The position also includes ownership details and the pool's unique identifier.`
+})
 export class DexPositionOwner extends ChainObject {
   @Exclude()
   static INDEX_KEY = "GCDPO"; //GalaChain Dex Position Owner
@@ -40,7 +40,10 @@ export class DexPositionOwner extends ChainObject {
   @IsString()
   poolHash: string;
 
-  @IsString({ each: true })
+  @JSONSchema({
+    description: `A tick range mapping that maps a tick range (eg. 10-20) to a unique position ID for this pool`
+  })
+  @IsStringRecord()
   tickRangeMap: Record<string, string>;
 
   /**
@@ -52,6 +55,7 @@ export class DexPositionOwner extends ChainObject {
     super();
     this.owner = owner;
     this.poolHash = poolHash;
+    this.tickRangeMap = {};
   }
 
   /**

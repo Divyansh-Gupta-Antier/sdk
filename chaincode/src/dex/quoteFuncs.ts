@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { NotFoundError, Pool, QuoteExactAmountDto, QuoteExactAmountResDto } from "@gala-chain/api";
+import { Pool, QuoteExactAmountDto, QuoteExactAmountResDto } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
 
 import { GalaChainContext } from "../types";

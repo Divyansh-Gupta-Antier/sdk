@@ -16,18 +16,25 @@ import {
   AddLiquidityDTO,
   AddLiquidityResDto,
   Pool,
+  PreConditionFailedError,
   SlippageToleranceExceededError,
   UserBalanceResDto,
   getLiquidityForAmounts,
   tickToSqrtPrice
 } from "@gala-chain/api";
-import BigNumber from "bignumber.js";
 
 import { fetchOrCreateBalance } from "../balances";
-import { fetchTokenClass } from "../token";
 import { transferToken } from "../transfer";
 import { GalaChainContext } from "../types";
-import { convertToTokenInstanceKey, getObjectByKey, putChainObject, validateTokenOrder } from "../utils";
+import {
+  convertToTokenInstanceKey,
+  getObjectByKey,
+  getTokenDecimalsFromPool,
+  putChainObject,
+  roundTokenAmount,
+  validateTokenOrder
+} from "../utils";
+import { NegativeAmountError } from "./dexError";
 import { fetchOrCreateDexPosition } from "./fetchOrCreateDexPosition";
 
 /**
@@ -52,15 +59,11 @@ export async function addLiquidity(
   const token0InstanceKey = convertToTokenInstanceKey(pool.token0ClassKey);
   const token1InstanceKey = convertToTokenInstanceKey(pool.token1ClassKey);
 
-  //fetch token classes
-  const token0Class = await fetchTokenClass(ctx, token0InstanceKey);
-  const token1Class = await fetchTokenClass(ctx, token1InstanceKey);
-
   const liquidityProvider = launchpadAddress ?? ctx.callingUser;
   const tickLower = parseInt(dto.tickLower.toString()),
-  tickUpper = parseInt(dto.tickUpper.toString());
-  
-  //get token amounts required for the desired liquidity
+    tickUpper = parseInt(dto.tickUpper.toString());
+
+  //calculate token amounts required for the desired liquidity
   const amount0Desired = dto.amount0Desired.f18(),
     amount1Desired = dto.amount1Desired.f18();
   const amount0Min = dto.amount0Min.f18(),
@@ -79,44 +82,50 @@ export async function addLiquidity(
 
   const poolHash = pool.genPoolHash();
   const poolAlias = pool.getPoolAlias();
-  const position = await fetchOrCreateDexPosition(ctx, poolHash, tickUpper, tickLower);
+  if (!dto.uniqueKey) throw new PreConditionFailedError("Unique key is required for this function.");
+  const position = await fetchOrCreateDexPosition(ctx, poolHash, tickUpper, tickLower, dto.uniqueKey);
 
   let [amount0, amount1] = pool.mint(position, tickLower, tickUpper, liquidity.f18());
 
+  // Verify whether the amounts are valid
   if (amount0.lt(amount0Min) || amount1.lt(amount1Min)) {
     throw new SlippageToleranceExceededError(
-      `Slippage check failed: amount0: ${amount0Min.toString()} <= ${amount0.toString()}, amount1: ${amount1Min.toString()} <= ${amount1.toString()}, liquidity: ${liquidity.toString()}`
+      `Slippage tolerance exceeded: expected minimums (amount0 ≥ ${dto.amount0Min.toString()}, amount1 ≥ ${dto.amount1Min.toString()}), but received (amount0 = ${amount0.toString()}, amount1 = ${amount1.toString()})`
     );
   }
+  if (amount0.isLessThan(0)) {
+    throw new NegativeAmountError(0, amount0.toString());
+  }
+  if (amount1.isLessThan(0)) {
+    throw new NegativeAmountError(1, amount1.toString());
+  }
 
-  if (amount0.isGreaterThan(0)) {
-    // transfer token0
-    await transferToken(ctx, {
-      from: liquidityProvider,
-      to: poolAlias,
-      tokenInstanceKey: token0InstanceKey,
-      quantity: new BigNumber(amount0).decimalPlaces(token0Class.decimals, BigNumber.ROUND_DOWN),
-      allowancesToUse: [],
-      authorizedOnBehalf: {
-        callingOnBehalf: liquidityProvider,
-        callingUser: liquidityProvider
-      }
-    });
-  }
-  if (amount1.isGreaterThan(0)) {
-    // transfer token1
-    await transferToken(ctx, {
-      from: liquidityProvider,
-      to: poolAlias,
-      tokenInstanceKey: token1InstanceKey,
-      quantity: new BigNumber(amount1).decimalPlaces(token1Class.decimals, BigNumber.ROUND_DOWN),
-      allowancesToUse: [],
-      authorizedOnBehalf: {
-        callingOnBehalf: liquidityProvider,
-        callingUser: liquidityProvider
-      }
-    });
-  }
+  const [token0Decimal, token1Decimal] = await getTokenDecimalsFromPool(ctx, pool);
+  // transfer token0
+  await transferToken(ctx, {
+    from: liquidityProvider,
+    to: poolAlias,
+    tokenInstanceKey: token0InstanceKey,
+    quantity: roundTokenAmount(amount0, token0Decimal),
+    allowancesToUse: [],
+    authorizedOnBehalf: {
+      callingOnBehalf: liquidityProvider,
+      callingUser: liquidityProvider
+    }
+  });
+
+  // transfer token1
+  await transferToken(ctx, {
+    from: liquidityProvider,
+    to: poolAlias,
+    tokenInstanceKey: token1InstanceKey,
+    quantity: roundTokenAmount(amount1, token1Decimal),
+    allowancesToUse: [],
+    authorizedOnBehalf: {
+      callingOnBehalf: liquidityProvider,
+      callingUser: liquidityProvider
+    }
+  });
 
   await putChainObject(ctx, position);
   await putChainObject(ctx, pool);
@@ -124,6 +133,6 @@ export async function addLiquidity(
   const liquidityProviderToken0Balance = await fetchOrCreateBalance(ctx, ctx.callingUser, token0InstanceKey);
   const liquidityProviderToken1Balance = await fetchOrCreateBalance(ctx, ctx.callingUser, token1InstanceKey);
   const userBalances = new UserBalanceResDto(liquidityProviderToken0Balance, liquidityProviderToken1Balance);
-  const response = new AddLiquidityResDto(userBalances, [amount0, amount1]);
+  const response = new AddLiquidityResDto(userBalances, [amount0.toFixed(), amount1.toFixed()]);
   return response;
 }

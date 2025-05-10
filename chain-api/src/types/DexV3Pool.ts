@@ -19,7 +19,6 @@ import { JSONSchema } from "class-validator-jsonschema";
 import { keccak256 } from "js-sha3";
 
 import {
-  Bitmap,
   ChainKey,
   ConflictError,
   SlippageToleranceExceededError,
@@ -32,8 +31,6 @@ import {
   computeSwapStep,
   feeAmountTickSpacing,
   flipTick,
-  genKey,
-  genPoolAlias,
   getAmount0Delta,
   getAmount1Delta,
   getFeeGrowthInside,
@@ -47,7 +44,7 @@ import {
   tickToSqrtPrice,
   updateTick
 } from "../utils";
-import { BigNumberProperty } from "../validators";
+import { BigNumberProperty, EnumProperty, IsStringRecord } from "../validators";
 import { ChainObject } from "./ChainObject";
 import { DexFeePercentageTypes } from "./DexDtos";
 import { DexPositionData } from "./DexPositionData";
@@ -69,7 +66,7 @@ export class Pool extends ChainObject {
   public readonly token1: string;
 
   @ChainKey({ position: 2 })
-  @IsNumber()
+  @EnumProperty(DexFeePercentageTypes)
   public readonly fee: DexFeePercentageTypes;
 
   @ValidateNested()
@@ -80,9 +77,12 @@ export class Pool extends ChainObject {
   @Type(() => TokenClassKey)
   public readonly token1ClassKey: TokenClassKey;
 
-  @ValidateNested()
-  @Type(() => Bitmap)
-  public bitmap: Bitmap;
+  @JSONSchema({
+    description:
+      "An object where each key is a tick index and each value is a 256-bit binary string indicating which ticks are active."
+  })
+  @IsStringRecord()
+  public bitmap: Record<string, string>;
 
   @ValidateNested()
   @Type(() => TickData)
