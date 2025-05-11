@@ -24,6 +24,7 @@ import {
   IsString,
   Max,
   Min,
+  ValidateIf,
   ValidateNested
 } from "class-validator";
 
@@ -37,7 +38,8 @@ import {
   EnumProperty,
   IsBigNumber,
   IsLessThan,
-  IsNonZeroBigNumber
+  IsNonZeroBigNumber,
+  IsUserAlias
 } from "../validators";
 import { TokenBalance } from "./TokenBalance";
 import { TokenClassKey } from "./TokenClass";
@@ -211,7 +213,6 @@ export class SwapDto extends ChainCallDTO {
   @IsOptional()
   public amountInMaximum?: BigNumber;
 
-  @IsBigNumber()
   @BigNumberProperty()
   @BigNumberIsNegative()
   @IsOptional()
@@ -322,7 +323,6 @@ export class Slot0ResDto extends ChainCallDTO {
   public sqrtPrice: BigNumber;
 
   @IsNotEmpty()
-  @IsNumber()
   @IsInt()
   public tick: number;
 
@@ -340,6 +340,7 @@ export class Slot0ResDto extends ChainCallDTO {
 
 export class GetPoolDataDTO extends ChainCallDTO {
   @IsNotEmpty()
+  @IsString()
   public address: string;
 }
 
@@ -400,8 +401,7 @@ export class GetPositionWithNftIdDto extends ChainCallDTO {
   @Type(() => TokenClassKey)
   public token1: TokenClassKey;
 
-  @IsNotEmpty()
-  @IsNumber()
+  @EnumProperty(DexFeePercentageTypes)
   public fee: number;
 
   @IsNotEmpty()
@@ -419,8 +419,10 @@ export class GetPositionWithNftIdDto extends ChainCallDTO {
 
 export class GetUserPositionsDto extends ChainCallDTO {
   @IsNotEmpty()
+  @IsUserAlias()
   public user: string;
 
+  @IsInt()
   @Min(1, { message: "Value cannot be zero" })
   @Max(10, { message: "Page can have atmost 10 values" })
   @IsNotEmpty()
@@ -477,18 +479,21 @@ export class GetPositionResDto extends ChainCallDTO {
 }
 
 export class GetAddLiquidityEstimationDto extends ChainCallDTO {
-  @IsBigNumber()
+  @BigNumberIsPositive()
   @BigNumberProperty()
   public amount: BigNumber;
+
   @IsNotEmpty()
   @IsInt()
   @Max(MAX_TICK)
   public tickUpper: number;
+
   @IsNotEmpty()
   @IsInt()
   @Min(MIN_TICK)
   @IsLessThan("tickUpper")
   public tickLower: number;
+
   @IsNotEmpty()
   @IsBoolean()
   public zeroForOne: boolean;
@@ -767,8 +772,8 @@ export class CollectTradingFeesDto extends ChainCallDTO {
   @EnumProperty(DexFeePercentageTypes)
   public fee: DexFeePercentageTypes;
 
-  @IsString()
   @IsNotEmpty()
+  @IsUserAlias()
   public recepient: string;
 
   constructor(token0: TokenClassKey, token1: TokenClassKey, fee: DexFeePercentageTypes, recepient: string) {
@@ -918,8 +923,8 @@ export class SetProtocolFeeResDto extends ChainCallDTO {
 }
 
 export class ConfigureDexFeeAddressDto extends ChainCallDTO {
-  @IsOptional()
-  @IsString()
+  @ValidateIf((e) => e.newDexFeeAddress !== undefined)
+  @IsUserAlias()
   public newDexFeeAddress?: string;
 
   @IsOptional()
@@ -958,6 +963,7 @@ export class BurnEstimateDto extends ChainCallDTO {
   public amount: BigNumber;
 
   @IsNotEmpty()
+  @IsUserAlias()
   public owner: string;
 
   constructor(
