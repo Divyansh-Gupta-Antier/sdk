@@ -760,6 +760,7 @@ export interface IPosition {
   tickUpper: number;
   tickLower: number;
   liquidity: string;
+  positionId: string;
   token0Img?: string;
   token1Img?: string;
   token0ClassKey?: TokenClassKey;
@@ -977,4 +978,23 @@ export class TransferPositionDto extends ChainCallDTO {
 
   @EnumProperty(DexFeePercentageTypes)
   public fee: DexFeePercentageTypes;
+}
+
+export class GetPositionByIdDto extends ChainCallDTO {
+  @IsNotEmpty()
+  @IsString()
+  poolHash: string;
+
+  @IsInt()
+  @Max(TickData.MAX_TICK)
+  tickUpper: number;
+
+  @IsInt()
+  @Min(TickData.MIN_TICK)
+  @IsLessThan("tickUpper")
+  tickLower: number;
+
+  @IsNotEmpty()
+  @IsString()
+  public positionId: string;
 }

@@ -49,7 +49,7 @@ export class DexPositionData extends ChainObject {
   @IsLessThan("tickUpper")
   tickLower: number;
 
-  @ChainKey({ position: 4 })
+  @ChainKey({ position: 3 })
   @IsNotEmpty()
   @IsString()
   positionId: string;

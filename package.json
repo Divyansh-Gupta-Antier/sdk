@@ -67,5 +67,9 @@
     "chain-connect",
     "chain-test",
     "chaincode"
-  ]
+  ],
+  "dependencies": {
+    "dd-trace": "^5.51.0",
+    "opentracing": "^0.14.7"
+  }
 }

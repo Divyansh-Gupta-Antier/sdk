@@ -24,6 +24,7 @@ export * from "./setProtocolFee";
 export * from "./collectTradingFees";
 export * from "./getPosition";
 export * from "./getUserPositions";
+export * from "./getPositionById"
 export * from "./dexError";
 export * from "./transferDexPosition";
 export * from "./dexUtils";
