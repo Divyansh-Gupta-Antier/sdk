@@ -94,14 +94,14 @@ export function splitBookmark(bookmark = "") {
  * Generates a tick range string in the format "lower-upper".
  */
 export function genTickRange(tickLower: number, tickUpper: number): string {
-  return [tickLower, tickUpper].join("-");
+  return [tickLower, tickUpper].join(":");
 }
 
 /**
  * Parses a tick range string and returns the lower and upper ticks as numbers.
  */
 export function parseTickRange(tickRange: string): { tickLower: number; tickUpper: number } {
-  const [tickLower, tickUpper] = tickRange.split("-").map(Number);
+  const [tickLower, tickUpper] = tickRange.split(":").map(Number);
 
   if (isNaN(tickLower) || isNaN(tickUpper)) {
     throw new Error(`Invalid tick range format: ${tickRange}`);
