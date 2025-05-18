@@ -43,10 +43,10 @@ export async function fetchOrCreateDexPosition(
   tickUpper: number,
   tickLower: number,
   uniqueKey: string,
-  owner?: string
+  positionId?: string
 ): Promise<DexPositionData> {
   const poolHash = pool.genPoolHash();
-  const positionHolder = owner ?? ctx.callingUser;
+  const positionHolder = ctx.callingUser;
   const tickRange = genTickRange(tickLower, tickUpper);
   const emptyUserPosition = new DexPositionOwner(positionHolder, poolHash);
 
@@ -59,9 +59,13 @@ export async function fetchOrCreateDexPosition(
 
   await fetchedUserPosition.validateOrReject();
 
-  // Check if position already exists for the tick range and create a new one if it doesn't
-  let positionId = fetchedUserPosition.getPositionId(tickRange);
+  // Check if the position Id provided is valid and try to fetch one if it isn't
+  positionId =
+    positionId && fetchedUserPosition.getTickRangeByPositionId(positionId) === tickRange
+      ? positionId
+      : fetchedUserPosition.getPositionId(tickRange);
 
+  // Create a new position if none exists
   if (!positionId) {
     positionId = keccak256(uniqueKey);
     fetchedUserPosition.addPosition(tickRange, positionId);
@@ -98,6 +102,7 @@ export async function fetchUserPositionInTickRange(
   poolHash: string,
   tickUpper: number,
   tickLower: number,
+  positionId?: string,
   owner?: string
 ): Promise<DexPositionData> {
   // Fetch user positions
@@ -105,8 +110,11 @@ export async function fetchUserPositionInTickRange(
   const tickRange = genTickRange(tickLower, tickUpper);
   const userPositions = await getUserPositionIds(ctx, positionHolder, poolHash);
 
-  // Check if user holds any position for this tick range
-  const positionId = userPositions.getPositionId(tickRange);
+  // Check if the provided position is valid and fetch
+  positionId =
+    positionId && userPositions.getTickRangeByPositionId(positionId) === tickRange
+      ? positionId
+      : userPositions.getPositionId(tickRange);
   if (!positionId) {
     throw new NotFoundError(`User doesnt holds any position for the tick range ${tickRange} in this pool.`);
   }

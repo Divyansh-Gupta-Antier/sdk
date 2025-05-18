@@ -2249,7 +2249,7 @@ describe("DEx v3 Testing", () => {
       expect(getData.Data?.protocolFeesToken0.toString()).toBe("0");
     });
 
-    describe("Transfer User Position", () => {
+    describe("Perform seperate operations on positions within the same tick range in the same pool", () => {
       it("Liquidity provider should be able to transfer his position to another user", async () => {
         const dto = new GetPositionDto(ETH_ClassKey, USDC_ClassKey, 500, 75920, 76110, user.identityKey);
 
@@ -2279,7 +2279,134 @@ describe("DEx v3 Testing", () => {
         });
       });
 
-      it("It will revery if Liquidity Provider is not the owner of the transferred position", async () => {
+      it("Should create another position in the same tick range and transfer it as well", async () => {
+        const pa = 1980,
+          pb = 2020;
+        const [ta, tb] = spacedTicksFromPrice(pa, pb, tickSpacing);
+        const expectedTokenDTO = new GetAddLiquidityEstimationDto(
+          ETH_ClassKey,
+          USDC_ClassKey,
+          fee,
+          new BigNumber(10),
+          ta,
+          tb,
+          true
+        ).signed(user.privateKey);
+        const slippage = 0.5;
+        const result = await client.dexV3Contract.getAddLiquidityEstimation(expectedTokenDTO);
+        const data = result.Data;
+        expect(data).toBeDefined();
+        if (!data) throw new Error();
+        const token0 = new BigNumber(data.amount0),
+          token1 = new BigNumber(data.amount1);
+        const [token0Slipped, token1Slipped] = slippedValue([token0, token1], slippage);
+        const dto = new AddLiquidityDTO(
+          ETH_ClassKey,
+          USDC_ClassKey,
+          fee,
+          ta,
+          tb,
+          token0,
+          token1,
+          token0Slipped,
+          token1Slipped
+        );
+        dto.uniqueKey = randomUUID();
+        dto.sign(user.privateKey);
+        await client.dexV3Contract.addLiquidity(dto);
+
+        const getPositionDto = new GetPositionDto(
+          ETH_ClassKey,
+          USDC_ClassKey,
+          500,
+          75920,
+          76110,
+          user.identityKey
+        );
+
+        const getSingleUserPosition = await client.dexV3Contract.getPositions(getPositionDto);
+        const positionID = getSingleUserPosition.Data?.positionId;
+
+        const transferDTO = new TransferDexPositionDto();
+        transferDTO.toAddress = user1.identityKey;
+        transferDTO.token0 = ETH_ClassKey;
+        transferDTO.token1 = USDC_ClassKey;
+        transferDTO.fee = 500;
+        transferDTO.positionId = positionID || "";
+        transferDTO.sign(user.privateKey);
+
+        await client.dexV3Contract.transferDexPosition(transferDTO);
+      });
+
+      it("Add positions to a specific position using its ID", async () => {
+        const mintEthDto = new MintTokenWithAllowanceDto();
+        mintEthDto.tokenClass = ETH_ClassKey;
+        mintEthDto.quantity = new BigNumber(100000);
+        mintEthDto.owner = user1.identityKey;
+        mintEthDto.tokenInstance = new BigNumber(0);
+        mintEthDto.sign(user.privateKey);
+        await client.tokenContract.MintTokenWithAllowance(mintEthDto);
+
+        const mintUSDCDto = new MintTokenWithAllowanceDto();
+        mintUSDCDto.tokenClass = USDC_ClassKey;
+        mintUSDCDto.quantity = new BigNumber(100000);
+        mintUSDCDto.owner = user1.identityKey;
+        mintUSDCDto.tokenInstance = new BigNumber(0);
+        mintUSDCDto.sign(user.privateKey);
+        await client.tokenContract.MintTokenWithAllowance(mintUSDCDto);
+
+        const getPositionsDto = new GetUserPositionsDto(user1.identityKey).signed(user1.privateKey);
+        const beforePositions = await client.dexV3Contract.getUserPositions(getPositionsDto);
+
+        const pa = 1980,
+          pb = 2020;
+        const [ta, tb] = spacedTicksFromPrice(pa, pb, tickSpacing);
+        const expectedTokenDTO = new GetAddLiquidityEstimationDto(
+          ETH_ClassKey,
+          USDC_ClassKey,
+          fee,
+          new BigNumber(10),
+          ta,
+          tb,
+          true
+        ).signed(user1.privateKey);
+        const slippage = 0.5;
+        const result = await client.dexV3Contract.getAddLiquidityEstimation(expectedTokenDTO);
+        const data = result.Data;
+        expect(data).toBeDefined();
+        if (!data) throw new Error();
+        const token0 = new BigNumber(data.amount0),
+          token1 = new BigNumber(data.amount1),
+          liqudityToBeAdded = new BigNumber(data.liquidity);
+        const [token0Slipped, token1Slipped] = slippedValue([token0, token1], slippage);
+        const dto = new AddLiquidityDTO(
+          ETH_ClassKey,
+          USDC_ClassKey,
+          fee,
+          ta,
+          tb,
+          token0,
+          token1,
+          token0Slipped,
+          token1Slipped,
+          beforePositions.Data?.positions[1].positionId
+        );
+        dto.uniqueKey = randomUUID();
+        dto.sign(user1.privateKey);
+        await client.dexV3Contract.addLiquidity(dto);
+
+        const getPositionsAfterDto = new GetUserPositionsDto(user1.identityKey).signed(user1.privateKey);
+        const positionsAfter = await client.dexV3Contract.getUserPositions(getPositionsAfterDto);
+
+        const before = new BigNumber(beforePositions.Data?.positions[1].liquidity ?? 0);
+        const after = new BigNumber(positionsAfter.Data?.positions[1].liquidity ?? 0);
+        const actualChange = after.minus(before);
+        const epsilon = new BigNumber("1e-10");
+        expect(actualChange.minus(liqudityToBeAdded).abs().lte(epsilon)).toBe(true);
+        console.log(`liq: ${actualChange.minus(liqudityToBeAdded).abs().lte(epsilon)}`);
+      });
+
+      it("It will revert if Liquidity Provider is not the owner of the transferred position", async () => {
         const transferDTO = new TransferDexPositionDto();
         transferDTO.toAddress = user1.identityKey;
         transferDTO.token0 = ETH_ClassKey;

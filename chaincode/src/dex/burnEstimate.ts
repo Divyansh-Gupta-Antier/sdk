@@ -41,6 +41,7 @@ export async function getRemoveLiquidityEstimation(
     pool.genPoolHash(),
     dto.tickUpper,
     dto.tickLower,
+    dto.positionId,
     dto.owner
   );
 
