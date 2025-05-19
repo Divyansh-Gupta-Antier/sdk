@@ -59,11 +59,17 @@ export async function fetchOrCreateDexPosition(
 
   await fetchedUserPosition.validateOrReject();
 
-  // Check if the position Id provided is valid and try to fetch one if it isn't
-  positionId =
-    positionId && fetchedUserPosition.getTickRangeByPositionId(positionId) === tickRange
-      ? positionId
-      : fetchedUserPosition.getPositionId(tickRange);
+  // Check if the position Id provided is valid or try to fetch one in given tick range
+  if (positionId) {
+    const actualTickRange = fetchedUserPosition.getTickRangeByPositionId(positionId);
+    if (actualTickRange !== tickRange) {
+      throw new NotFoundError(
+        `Cannot find any position with the id ${positionId} in the tick range ${tickRange} that belongs to ${positionHolder} in this pool.`
+      );
+    }
+  } else {
+    positionId = fetchedUserPosition.getPositionId(tickRange);
+  }
 
   // Create a new position if none exists
   if (!positionId) {
@@ -110,13 +116,19 @@ export async function fetchUserPositionInTickRange(
   const tickRange = genTickRange(tickLower, tickUpper);
   const userPositions = await getUserPositionIds(ctx, positionHolder, poolHash);
 
-  // Check if the provided position is valid and fetch
-  positionId =
-    positionId && userPositions.getTickRangeByPositionId(positionId) === tickRange
-      ? positionId
-      : userPositions.getPositionId(tickRange);
-  if (!positionId) {
-    throw new NotFoundError(`User doesnt holds any position for the tick range ${tickRange} in this pool.`);
+  // Check if the position Id provided is valid or try to fetch one in given tick range
+  if (positionId) {
+    const actualTickRange = userPositions.getTickRangeByPositionId(positionId);
+    if (actualTickRange !== tickRange) {
+      throw new NotFoundError(
+        `Cannot find any position with the id ${positionId} in the tick range ${tickRange} that belongs to ${positionHolder} in this pool.`
+      );
+    }
+  } else {
+    positionId = userPositions.getPositionId(tickRange);
+    if (!positionId) {
+      throw new NotFoundError(`User doesnt holds any position for the tick range ${tickRange} in this pool.`);
+    }
   }
 
   // Fetch and return position data

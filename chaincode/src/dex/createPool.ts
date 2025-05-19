@@ -60,7 +60,7 @@ export async function createPool(ctx: GalaChainContext, dto: CreatePoolDto): Pro
     dto.token0,
     dto.token1,
     dto.fee,
-    dto.initialSqrtPrice.f18(),
+    dto.initialSqrtPrice,
     protocolFee
   );
 

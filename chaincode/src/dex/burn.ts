@@ -84,7 +84,7 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<UserBal
     const poolTokenBalance = await fetchOrCreateBalance(ctx, poolAlias, tokenInstanceKeys[index]);
     const roundedAmount = roundTokenAmount(amount, tokenDecimals[index]);
 
-    if (!roundedAmount.isGreaterThan(poolTokenBalance.getQuantityTotal())) {
+    if (roundedAmount.isGreaterThan(poolTokenBalance.getQuantityTotal())) {
       let maximumBurnableLiquidity: BigNumber;
       if (index === 0) {
         maximumBurnableLiquidity = liquidity0(
