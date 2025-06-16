@@ -1,3 +1,4 @@
+import { poolTest } from '@gala-chain/test';
 /*
  * Copyright (c) Gala Games Inc. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -69,6 +70,7 @@ import {
 } from "@gala-chain/test";
 import BigNumber from "bignumber.js";
 import { plainToInstance } from "class-transformer";
+import { Console } from "console";
 import { randomUUID } from "crypto";
 
 import TOKENS, { ETH_ClassKey, USDC_ClassKey, USDT_ClassKey } from "./tokens";
@@ -497,6 +499,7 @@ describe("DEx v3 Testing", () => {
       const slippage = 0.5;
 
       const result = await client.dexV3Contract.getAddLiquidityEstimation(expectedTokenDTO);
+      console.log("Resule from Dex API",JSON.stringify(result));
       const data = result.Data;
       expect(data).toBeDefined();
       if (!data) throw new Error();
@@ -629,6 +632,8 @@ describe("DEx v3 Testing", () => {
       if (!data) throw new Error();
       const token0 = new BigNumber(data.amount0),
         token1 = new BigNumber(data.amount1);
+
+    
       const [token0Slipped, token1Slipped] = slippedValue([token0, token1], slippage);
       const dto = new AddLiquidityDTO(
         ETH_ClassKey,

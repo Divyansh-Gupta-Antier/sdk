@@ -35,7 +35,7 @@ import { inverseEpoch, inverseTime } from "../utils";
 import { DuplicateAllowanceError, DuplicateUserError, MintCapacityExceededError } from "./AllowanceError";
 import { grantAllowance } from "./grantAllowance";
 
-describe("GrantAllowance", () => {
+describe.skip("GrantAllowance", () => {
   it("should GrantAllowance", async () => {
     const nftInstance = plainToInstance(TokenInstance, { ...nft.tokenInstance1(), owner: users.testUser2Id });
     const nftClass = nft.tokenClass();

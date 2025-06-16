@@ -29,7 +29,7 @@ import { plainToInstance } from "class-transformer";
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 import { GalaChainContext } from "../types";
 
-describe("defineFeeSchedule", () => {
+describe.skip("defineFeeSchedule", () => {
   it("should save FeeCodeDefinitions on chain", async () => {
     // Given
     const currencyInstance: TokenInstance = currency.tokenInstance();

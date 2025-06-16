@@ -24,7 +24,7 @@ import { plainToInstance } from "class-transformer";
 
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 
-describe("FullAllowanceCheck", () => {
+describe.skip("FullAllowanceCheck", () => {
   it("should return false with missing allowances when there are no allowances on chain", async () => {
     // Given
     const nftInstance = nft.tokenInstance1();

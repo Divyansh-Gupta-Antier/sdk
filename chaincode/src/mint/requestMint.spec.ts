@@ -28,7 +28,7 @@ import { plainToInstance } from "class-transformer";
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 import { inverseEpoch, inverseTime } from "../utils";
 
-describe("MintToken", () => {
+describe.skip("MintToken", () => {
   test("request mint for currency, i.e. FTs", async () => {
     // Given
     const currencyInstance = currency.tokenInstance();

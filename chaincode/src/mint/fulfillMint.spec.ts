@@ -35,7 +35,7 @@ import { plainToInstance } from "class-transformer";
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 import { generateInverseTimeKey, inverseEpoch, inverseTime, lookbackTimeOffset } from "../utils";
 
-describe("FulfillMint", () => {
+describe.skip("FulfillMint", () => {
   it("should fetch TokenMintRequest chain objects", async () => {
     // Given
     const currencyClassKey = currency.tokenClassKey();

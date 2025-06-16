@@ -152,9 +152,10 @@ export async function getUserPositionIds(
  * @returns A Promise resolving to a tuple of [token0Decimals, token1Decimals].
  */
 export async function getTokenDecimalsFromPool(ctx: GalaChainContext, pool: Pool): Promise<[number, number]> {
-  const token0Class = await fetchTokenClass(ctx, pool.token0ClassKey);
-  const token1Class = await fetchTokenClass(ctx, pool.token1ClassKey);
 
+  const token0Class = await fetchTokenClass(ctx, pool.token0ClassKey);
+  const token1Class = await fetchTokenClass(ctx, pool.token1ClassKey);  
+  
   return [token0Class.decimals, token1Class.decimals];
 }
 

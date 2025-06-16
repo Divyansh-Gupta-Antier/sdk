@@ -1,3 +1,4 @@
+import { Console } from 'console';
 /*
  * Copyright (c) Gala Games Inc. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +26,7 @@ import {
   tickToSqrtPrice
 } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
+import { threadId } from "worker_threads";
 
 import { fetchOrCreateBalance } from "../balances";
 import { transferToken } from "../transfer";
@@ -44,7 +46,8 @@ import { fetchOrCreateTickDataPair } from "./tickData.helper";
  */
 export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<DexOperationResDto> {
   // Fetch pool and user position
-  const [token0, token1] = validateTokenOrder(dto.token0, dto.token1);
+ const [token0, token1] = validateTokenOrder(dto.token0, dto.token1);
+ 
 
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key);
@@ -59,20 +62,24 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<DexOper
     dto.positionId
   );
 
+
   if (!position)
     throw new NotFoundError(`User doesn't hold any positions with this tick rangeData in thisData pool`);
-
+   
   const tickLower = parseInt(dto.tickLower.toString()),
     tickUpper = parseInt(dto.tickUpper.toString());
-
+ 
   //Create tokenInstanceKeys
   const token0InstanceKey = TokenInstanceKey.fungibleKey(pool.token0ClassKey);
   const token1InstanceKey = TokenInstanceKey.fungibleKey(pool.token1ClassKey);
   const tokenDecimals = await getTokenDecimalsFromPool(ctx, pool);
+  
 
+  
   // Estimate how much liquidity can actually be burned based on current pool balances and prices
   let amountToBurn = dto.amount.f18();
   const amountsEstimated = pool.burnEstimate(amountToBurn, tickLower, tickUpper);
+  
   const sqrtPriceA = tickToSqrtPrice(tickLower),
     sqrtPriceB = tickToSqrtPrice(tickUpper);
   const sqrtPrice = pool.sqrtPrice;
@@ -80,13 +87,21 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<DexOper
   const poolToken0Balance = await fetchOrCreateBalance(ctx, poolAlias, token0InstanceKey);
   const poolToken1Balance = await fetchOrCreateBalance(ctx, poolAlias, token1InstanceKey);
 
+  console.log("))))))))))000)", JSON.stringify(poolToken0Balance));
+  console.log("))))))))111111))", JSON.stringify(poolToken1Balance));
+
+  
+
   // Adjust burn amount if pool lacks sufficient liquidity
   for (const [index, amount] of amountsEstimated.entries()) {
+    console.log("Index", index, " AMOUNT", amount);
     if (amount.lt(0)) {
       throw new NegativeAmountError(index, amount.toString());
     }
 
+    console.log("TOken decimal index values Is", tokenDecimals[index]);
     const roundedAmount = roundTokenAmount(amount, tokenDecimals[index]);
+    console.log("THIS IS THE ROUNDED AMOUNT", roundedAmount, tokenDecimals[index]);
 
     if (
       roundedAmount.isGreaterThan(
@@ -107,6 +122,9 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<DexOper
           sqrtPrice.lt(sqrtPriceB) ? sqrtPrice : sqrtPriceB
         );
       }
+
+ 
+
       amountToBurn = BigNumber.min(amountToBurn, maximumBurnableLiquidity);
     }
   }
@@ -118,6 +136,7 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<DexOper
     tickLower,
     tickUpper
   );
+
   const amounts = pool.burn(position, tickLowerData, tickUpperData, amountToBurn);
 
   if (amounts[0].lt(dto.amount0Min) || amounts[1].lt(dto.amount1Min)) {
@@ -143,6 +162,10 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<DexOper
     roundTokenAmount(amounts[1], tokenDecimals[1]),
     poolToken1Balance.getQuantityTotal()
   );
+ 
+
+
+  
 
   // Transfer tokens to positon holder
   await transferToken(ctx, {
@@ -167,16 +190,19 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<DexOper
       callingOnBehalf: poolAlias,
       callingUser: poolAlias
     }
-  });
+  }); 
 
   await putChainObject(ctx, pool);
   await putChainObject(ctx, position);
   await putChainObject(ctx, tickUpperData);
   await putChainObject(ctx, tickLowerData);
 
+ 
+
   // Return position holder's new token balances
   const liquidityProviderToken0Balance = await fetchOrCreateBalance(ctx, ctx.callingUser, token0InstanceKey);
   const liquidityProviderToken1Balance = await fetchOrCreateBalance(ctx, ctx.callingUser, token1InstanceKey);
+  console.log("Liquiduty provider token balane", liquidityProviderToken0Balance, "++", liquidityProviderToken1Balance);
   const userBalances = new UserBalanceResDto(liquidityProviderToken0Balance, liquidityProviderToken1Balance);
 
   return new DexOperationResDto(

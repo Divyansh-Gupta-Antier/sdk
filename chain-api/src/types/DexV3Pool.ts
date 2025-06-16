@@ -142,7 +142,7 @@ export class Pool extends ChainObject {
     this.tickSpacing = feeAmountTickSpacing[fee];
     this.maxLiquidityPerTick = tickSpacingToMaxLiquidityPerTick(this.tickSpacing);
 
-    if (this.protocolFees < 0 || this.protocolFees > 1) {
+    if (protocolFees < 0 || protocolFees > 1) {
       throw new ValidationFailedError("Protocol Fees out of bounds");
     }
     this.protocolFees = protocolFees;
@@ -195,9 +195,7 @@ export class Pool extends ChainObject {
         amount1Req = getAmount1Delta(sqrtPriceLower, this.sqrtPrice, liquidityDelta);
         //liquidity is added to the active liquidity
         this.liquidity = this.liquidity.plus(liquidityDelta);
-        this.grossPoolLiquidity = this.grossPoolLiquidity.plus(
-          liquidityDelta.multipliedBy(Math.abs(tickUpper - tickLower))
-        );
+
         requirePosititve(this.liquidity);
       }
       //current tick is above the desired range
@@ -362,7 +360,7 @@ export class Pool extends ChainObject {
    * @param protocolFees Percentage of protocol fees that needs to be deducted
    */
   public configureProtocolFee(protocolFees: number) {
-    if (this.protocolFees < 0 || this.protocolFees > 1) {
+    if (protocolFees < 0 || protocolFees > 1) {
       throw new ValidationFailedError("Protocol Fees out of bounds");
     }
     this.protocolFees = protocolFees;

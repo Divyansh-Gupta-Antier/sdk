@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 import { ChainError, ErrorCode, NonFunctionProperties, TokenBalance, TokenClassKey } from "@gala-chain/api";
+import { ERROR } from "opentracing/lib/ext/tags";
 
 import { GalaChainContext } from "../types";
 import { getObjectByKey } from "../utils";
@@ -43,8 +44,8 @@ export async function fetchOrCreateBalance(
   const fetchedBalance = await getObjectByKey(ctx, TokenBalance, emptyBalance.getCompositeKey()).catch((e) =>
     ChainError.ignore(e, ErrorCode.NOT_FOUND, emptyBalance)
   );
-
   await fetchedBalance.validateOrReject();
+
 
   return fetchedBalance;
 }

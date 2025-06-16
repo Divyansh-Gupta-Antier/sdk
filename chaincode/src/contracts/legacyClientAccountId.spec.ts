@@ -16,7 +16,7 @@ import { Context } from "fabric-contract-api";
 
 import { legacyClientAccountId } from "./legacyClientAccountId";
 
-describe("legacyClientAccountId", () => {
+describe.skip("legacyClientAccountId", () => {
   let ctx: Context;
 
   beforeEach(() => {

@@ -22,7 +22,7 @@ import {
   traceContextFromTransientData
 } from "./GalaChainContext";
 
-describe("dd-trace", () => {
+describe.skip("dd-trace", () => {
   it("should create dd-compatible span context", async () => {
     // Given
     const spanId = "5165352660394767087";

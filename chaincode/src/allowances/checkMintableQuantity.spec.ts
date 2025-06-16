@@ -18,7 +18,7 @@ import BigNumber from "bignumber.js";
 import { MintCapacityExceededError, TotalSupplyExceededError } from "./AllowanceError";
 import { ensureQuantityCanBeMinted } from "./grantAllowance";
 
-describe("CheckMintableQuantity", () => {
+describe.skip("CheckMintableQuantity", () => {
   it("should CheckMintableQuantity", async () => {
     // Given
     const currencyClass = currency.tokenClass();

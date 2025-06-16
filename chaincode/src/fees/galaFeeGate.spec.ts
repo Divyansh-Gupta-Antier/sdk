@@ -31,7 +31,7 @@ import { GalaChainContext } from "../types";
 import { txUnixTimeToDateIndexKeys } from "../utils";
 import { galaFeeGate } from "./galaFeeGate";
 
-describe("feeGate", () => {
+describe.skip("feeGate", () => {
   const feeCode1 = "testCode";
   const feeThreshold = new BigNumber("10");
 

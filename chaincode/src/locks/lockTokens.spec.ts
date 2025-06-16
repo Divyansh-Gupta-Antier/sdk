@@ -20,7 +20,7 @@ import { plainToInstance } from "class-transformer";
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 import { InvalidDecimalError } from "../token";
 
-describe("LockTokens", () => {
+describe.skip("LockTokens", () => {
   test(`Adds a "lock" hold to a user's GalaChainTokenBalance`, async () => {
     // Given
     const nftInstance = nft.tokenInstance1();

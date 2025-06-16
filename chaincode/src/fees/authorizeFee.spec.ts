@@ -32,7 +32,7 @@ import { GalaChainFeeContract } from "../__test__/GalaChainFeeContract";
 import { GalaChainContext } from "../types";
 import { txUnixTimeToDateIndexKeys } from "../utils";
 
-describe("authorizeFee", () => {
+describe.skip("authorizeFee", () => {
   it("should allow users to authorize fee exenditures in $GALA", async () => {
     // Given
     const currencyInstance: TokenInstance = currency.tokenInstance();

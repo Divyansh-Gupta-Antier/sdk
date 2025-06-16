@@ -15,5 +15,7 @@
 import currency from "./currency";
 import nft from "./nft";
 import users from "./users";
+import poolTest from "./poolTest";
+import dex from "./dex";
 
-export { currency, nft, users };
+export { currency, nft, users, poolTest, dex};

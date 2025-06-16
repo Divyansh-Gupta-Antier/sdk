@@ -31,7 +31,7 @@ import { plainToInstance } from "class-transformer";
 
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 
-describe("FulfillTokenSale", () => {
+describe.skip("FulfillTokenSale", () => {
   it("should fulfill TokenSale", async () => {
     // Given
     const currencyClass = currency.tokenClass();

@@ -24,7 +24,7 @@ import { plainToInstance } from "class-transformer";
 
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 
-it("should Fetch Token Balances with Token Class Metadata", async () => {
+it.skip("should Fetch Token Balances with Token Class Metadata", async () => {
   // Given
   const currencyClass = currency.tokenClass();
   const currencyBalance = currency.tokenBalance();

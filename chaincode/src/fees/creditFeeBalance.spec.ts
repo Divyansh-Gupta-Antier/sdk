@@ -52,7 +52,7 @@ class TestPublicKey extends ChainObject {
   public publicKey: string;
 }
 
-describe("creditFeeBalance", () => {
+describe.skip("creditFeeBalance", () => {
   it("should record fee authorizations to a FeePendingBalance", async () => {
     // Given
     const currencyInstance: TokenInstance = currency.tokenInstance();

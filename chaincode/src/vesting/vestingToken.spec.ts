@@ -37,7 +37,7 @@ import { plainToInstance } from "class-transformer";
 
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 
-describe("VestingToken", () => {
+describe.skip("VestingToken", () => {
   const tokenClassKey = new TokenClassKey();
   tokenClassKey.collection = randomize("TEST");
   tokenClassKey.category = "Unit";

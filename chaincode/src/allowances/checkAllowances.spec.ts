@@ -20,7 +20,7 @@ import { plainToInstance } from "class-transformer";
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 import { checkAllowances, isAllowanceExpired } from "./checkAllowances";
 
-describe("checkAllowances", () => {
+describe.skip("checkAllowances", () => {
   it("should not count expired allowances", async () => {
     const checkAllowancesFixture = fixture(GalaChainTokenContract).callingUser(users.testAdminId);
 

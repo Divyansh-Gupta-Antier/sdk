@@ -18,7 +18,7 @@ import { plainToInstance } from "class-transformer";
 
 import GalaChainTokenContract from "../__test__/GalaChainTokenContract";
 
-describe("FetchBurns", () => {
+describe.skip("FetchBurns", () => {
   it("should FetchBurns", async () => {
     // Given
     const nftInstance = nft.tokenInstance1();

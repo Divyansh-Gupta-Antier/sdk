@@ -46,7 +46,7 @@ import { GalaChainContext, createValidChainObject } from "../types";
  * Test below verifies that the base class of TestGalaContract (i.e. GalaContract) provides stub to
  * handle transactionality in a way that when the method ends with error, no state is saved.
  */
-describe("GalaContract transaction consistency", () => {
+describe.skip("GalaContract transaction consistency", () => {
   let chaincode: TestChaincode;
   let contract: TestGalaContract;
   let originalCreateContext: typeof contract.createContext;

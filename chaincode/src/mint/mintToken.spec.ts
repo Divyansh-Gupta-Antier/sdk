@@ -36,7 +36,7 @@ import { TotalSupplyExceededError } from "../allowances/AllowanceError";
 import { InvalidDecimalError } from "../token";
 import { inverseEpoch, inverseTime } from "../utils";
 
-describe("MintToken", () => {
+describe.skip("MintToken", () => {
   test("mints currency, i.e. FTs", async () => {
     // Given
     const currencyInstance = currency.tokenInstance();

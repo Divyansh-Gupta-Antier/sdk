@@ -61,6 +61,8 @@ export async function processSwapSteps(
       state.sqrtPrice
     );
 
+    console.log("It has reached here");
+
     // Reject if next tick is out of bounds
     if (step.tickNext < TickData.MIN_TICK || step.tickNext > TickData.MAX_TICK) {
       throw new ConflictError("Not enough liquidity available in pool");

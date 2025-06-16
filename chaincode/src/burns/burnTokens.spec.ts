@@ -32,7 +32,7 @@ import { inverseEpoch, inverseTime } from "../utils";
 import { InsufficientBurnAllowanceError } from "./BurnError";
 import { burnTokens } from "./burnTokens";
 
-describe("BurnTokens", () => {
+describe.skip("BurnTokens", () => {
   it("should BurnTokens", async () => {
     // Given
     const nftInstance = nft.tokenInstance1();

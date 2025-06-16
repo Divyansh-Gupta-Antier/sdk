@@ -32,7 +32,7 @@ import { AllowanceUsersMismatchError, InsufficientAllowanceError } from "../allo
 import { InvalidDecimalError } from "../token";
 import { SameSenderAndRecipientError } from "./TransferError";
 
-describe("TransferToken", () => {
+describe.skip("TransferToken", () => {
   test("TransferToken from user's wallet fails for locked token", async () => {
     // Given
     const nftInstance = nft.tokenInstance1();

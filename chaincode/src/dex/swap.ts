@@ -48,6 +48,7 @@ import { processSwapSteps } from "./swap.helper";
  * @returns 
  */
 export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapResDto> {
+  console.log("Idher aa bhi raha h>>>");
   const [token0, token1] = validateTokenOrder(dto.token0, dto.token1);
   const zeroForOne = dto.zeroForOne;
   const sqrtPriceLimit = dto.sqrtPriceLimit;
@@ -57,23 +58,31 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
 
   // Validate sqrtPriceLimit and input amount
   if (zeroForOne) {
-    if (
+
+  console.log("Sqare root price", JSON.stringify(sqrtPriceLimit));
+  console.log("Pool sqrt price", JSON.stringify(pool.sqrtPrice));
+
+  if (
       !(
         sqrtPriceLimit.isLessThan(pool.sqrtPrice) &&
         sqrtPriceLimit.isGreaterThan(new BigNumber("0.000000000000000000054212146"))
       )
     )
-      throw new SlippageToleranceExceededError("SquarePriceLImit exceeds limit");
+      throw new SlippageToleranceExceededError("SquareRootPrice Limit Exceeds");
   } else {
+    console.log("Sqare root price false", JSON.stringify(sqrtPriceLimit));
+    console.log("Pool sqrt price false", JSON.stringify(pool.sqrtPrice));
+  
     if (
       !(
         sqrtPriceLimit.isGreaterThan(pool.sqrtPrice) &&
         sqrtPriceLimit.isLessThan(new BigNumber("18446051000000000000"))
       )
     )
-      throw new SlippageToleranceExceededError("SquarePriceLImit exceeds limit");
+      throw new SlippageToleranceExceededError("SquareRootPrice Limit Exceeds");
   }
   const amountSpecified = dto.amount;
+
 
   if (amountSpecified.isEqualTo(0)) throw new ValidationFailedError("Invalid specified amount");
 
@@ -107,6 +116,7 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
   //fetch token classes
   const tokenClasses = await Promise.all(tokenInstanceKeys.map((key) => fetchTokenClass(ctx, key)));
 
+
   for (const [index, amount] of amounts.entries()) {
     if (amount.gt(0)) {
       if (dto.amountInMaximum && amount.gt(dto.amountInMaximum)) {
@@ -114,7 +124,7 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
           `Slippage tolerance exceeded: maximum allowed tokens (${dto.amountInMaximum}) is less than required amount (${amount}).`
         );
       }
-
+     console.log("POol balance at 1", roundTokenAmount(amount, tokenClasses[index].decimals))
       await transferToken(ctx, {
         from: ctx.callingUser,
         to: poolAlias,
@@ -125,11 +135,14 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
       });
     }
     if (amount.lt(0)) {
+      console.log("Amount out minimum", JSON.stringify(dto.amountOutMinimum));
+      console.log("Amount", JSON.stringify(amount));
       if (dto.amountOutMinimum && amount.gt(dto.amountOutMinimum)) {
         throw new SlippageToleranceExceededError(
-          `Slippage tolerance exceeded: minimum received tokens (${dto.amountInMaximum}) is less than actual received amount (${amount}).`
+          `Slippage tolerance exceeded: minimum received tokens (${dto.amountOutMinimum}) is less than actual received amount (${amount}).`
         );
       }
+
 
       const poolTokenBalance = await fetchOrCreateBalance(
         ctx,
@@ -137,10 +150,15 @@ export async function swap(ctx: GalaChainContext, dto: SwapDto): Promise<SwapRes
         tokenInstanceKeys[index].getTokenClassKey()
       );
       const roundedAmount = new BigNumber(amount.toFixed(tokenClasses[index].decimals)).abs();
+
+      console.log("Pool token balance", JSON.stringify(poolTokenBalance.getQuantityTotal()), "ROUNDED AMOUNT", JSON.stringify(roundedAmount));
+    
+      
       if (poolTokenBalance.getQuantityTotal().isLessThan(roundedAmount)) {
         throw new ConflictError("Not enough liquidity available in pool");
       }
 
+      console.log("POol balance at 2", roundedAmount);
       await transferToken(ctx, {
         from: poolAlias,
         to: ctx.callingUser,

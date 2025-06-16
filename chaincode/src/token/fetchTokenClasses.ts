@@ -1,3 +1,4 @@
+import { Console } from 'console';
 /*
  * Copyright (c) Gala Games Inc. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +42,7 @@ export async function fetchTokenClass(
   ctx: GalaChainContext,
   tokenClassKey: TokenClassKey | TokenInstanceKey
 ): Promise<TokenClass> {
+  console.log("________",tokenClassKey )
   const tokenClass = await getObjectByKey(
     ctx,
     TokenClass,
@@ -48,6 +50,7 @@ export async function fetchTokenClass(
   ).catch(() => {
     throw new TokenClassNotFoundError(tokenClassKey.toStringKey());
   });
+ 
   return tokenClass;
 }
 
