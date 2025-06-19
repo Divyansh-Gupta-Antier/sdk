@@ -23,6 +23,7 @@ import {
   sqrtPriceToTick
 } from "@gala-chain/api";
 import BigNumber from "bignumber.js";
+import { Console } from "console";
 
 import { fetchOrCreateBalance } from "../balances";
 import { GalaChainContext } from "../types";
@@ -54,7 +55,6 @@ export async function quoteExactAmount(
   // Generate pool key from tokens and fee tier
   const key = ctx.stub.createCompositeKey(Pool.INDEX_KEY, [token0, token1, dto.fee.toString()]);
   const pool = await getObjectByKey(ctx, Pool, key);
-  if (pool == undefined) throw new NotFoundError("Pool does not exist");
 
   // Define square root price limit as the maximum possible value in trade direction for estimation purposes
   const sqrtPriceLimit = zeroForOne
@@ -96,10 +96,16 @@ export async function quoteExactAmount(
   const roundedToken0Amount = roundTokenAmount(amount0, token0Decimal);
   const roundedToken1Amount = roundTokenAmount(amount1, token1Decimal);
 
-  // Check whether pool has enough liquidity to carry out this operation
+  console.log("Rounded Token 0 Amount", JSON.stringify(roundedToken0Amount));
+  console.log("Roundede Token 1 Amount", JSON.stringify(roundedToken1Amount));
+  console.log("Pool token balance O",await fetchOrCreateBalance(ctx, pool.getPoolAlias(), pool.token0ClassKey) );
+  console.log("Pool token balance 1", await fetchOrCreateBalance(ctx, pool.getPoolAlias(), pool.token1ClassKey) );
+  // Check whether pool has enough liq uidity to carry out this operation
   if (roundedToken0Amount.isNegative()) {
     const poolTokenBalance = await fetchOrCreateBalance(ctx, pool.getPoolAlias(), pool.token0ClassKey);
+   
     if (poolTokenBalance.getQuantityTotal().isLessThan(roundedToken0Amount.abs())) {
+      console.log("++++++++++++++++++++++");
       throw new ConflictError("Not enough liquidity available in pool");
     }
   } else {

@@ -89,7 +89,9 @@ export class DexPositionOwner extends ChainObject {
    * @returns The associated position ID, or undefined if not found.
    */
   getPositionId(tickRange: string): string | undefined {
+    console.log("6");
     return this.tickRangeMap[tickRange]?.[0];
+    
   }
   /**
    * Returns the tick range key that includes the given position ID.
@@ -99,10 +101,11 @@ export class DexPositionOwner extends ChainObject {
    * @returns The corresponding tick range key, or undefined if not found
    */
   getTickRangeByPositionId(positionId: string): string | undefined {
+    console.log("2");
     const tickRange = Object.entries(this.tickRangeMap).find(([_, positionIds]) =>
       positionIds.includes(positionId)
     )?.[0];
-
+    console.log("3");
     return tickRange;
   }
 }

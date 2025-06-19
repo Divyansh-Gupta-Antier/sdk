@@ -141,6 +141,7 @@ export async function getUserPositionIds(
   poolHash: string
 ): Promise<DexPositionOwner> {
   const compositeKey = ctx.stub.createCompositeKey(DexPositionOwner.INDEX_KEY, [positionHolder, poolHash]);
+  console.log("Get User position by ID inside");
   return getObjectByKey(ctx, DexPositionOwner, compositeKey);
 }
 

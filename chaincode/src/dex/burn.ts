@@ -87,10 +87,7 @@ export async function burn(ctx: GalaChainContext, dto: BurnDto): Promise<DexOper
   const poolToken0Balance = await fetchOrCreateBalance(ctx, poolAlias, token0InstanceKey);
   const poolToken1Balance = await fetchOrCreateBalance(ctx, poolAlias, token1InstanceKey);
 
-  console.log("))))))))))000)", JSON.stringify(poolToken0Balance));
-  console.log("))))))))111111))", JSON.stringify(poolToken1Balance));
 
-  
 
   // Adjust burn amount if pool lacks sufficient liquidity
   for (const [index, amount] of amountsEstimated.entries()) {

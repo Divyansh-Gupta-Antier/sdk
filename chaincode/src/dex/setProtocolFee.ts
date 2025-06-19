@@ -63,13 +63,12 @@ export async function setProtocolFee(
  * @throws UnauthorizedError - If the calling user is not from the CuratorOrg MSP
  *                             or is not an authorized authority.
  */
-export async function configureDexFeeAddress(ctx: GalaChainContext, dto: ConfigureDexFeeAddressDto) {
-  if (!dto.newAuthorities?.length) {
-    throw new ValidationFailedError("At least one user should be defined to provide access");
-  }
-
+export async function configureDexFeeAddress(
+  ctx: GalaChainContext,
+  dto: ConfigureDexFeeAddressDto
+): Promise<DexFeeConfig> {
   const curatorOrgMsp = process.env.CURATOR_ORG_MSP ?? "CuratorOrg";
-
+  console.log("is it hitting fromhrer");
   if (ctx.clientIdentity.getMSPID() !== curatorOrgMsp) {
     throw new UnauthorizedError(`CallingUser ${ctx.callingUser} is not authorized to create or update`);
   }
@@ -80,6 +79,7 @@ export async function configureDexFeeAddress(ctx: GalaChainContext, dto: Configu
   } else if (protocolFeeConfig && protocolFeeConfig.authorities.includes(ctx.callingUser)) {
     protocolFeeConfig.addOrUpdateAuthorities(dto.newAuthorities ?? protocolFeeConfig.authorities);
   } else {
+    
     throw new UnauthorizedError(`CallingUser ${ctx.callingUser} is not authorized to create or update`);
   }
 

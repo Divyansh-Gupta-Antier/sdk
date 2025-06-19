@@ -67,5 +67,8 @@
     "chain-connect",
     "chain-test",
     "chaincode"
-  ]
+  ],
+  "dependencies": {
+    "@gala-chain/api": "^1.10.1"
+  }
 }

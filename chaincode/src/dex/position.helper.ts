@@ -61,6 +61,7 @@ export async function fetchOrCreateDexPosition(
   // Check if the position Id provided is valid or try to fetch one in given tick range
   if (positionId) {
     const actualTickRange = fetchedUserPosition.getTickRangeByPositionId(positionId);
+
     if (actualTickRange !== tickRange) {
       throw new NotFoundError(
         `Cannot find any position with the id ${positionId} in the tick range ${tickRange} that belongs to ${ctx.callingUser} in this pool.`
@@ -114,7 +115,9 @@ export async function fetchUserPositionInTickRange(
 
   const positionHolder = owner ?? ctx.callingUser;
   const tickRange = genTickRange(tickLower, tickUpper);
+
   const userPositions = await getUserPositionIds(ctx, positionHolder, poolHash);
+
   //Working fine here
 
   // Check if the position Id provided is valid or try to fetch one in given tick range
@@ -131,10 +134,10 @@ export async function fetchUserPositionInTickRange(
       throw new NotFoundError(`User doesnt holds any position for the tick range ${tickRange} in this pool.`);
     }
   }
-  //throw new Error("This is the output data");
   // Fetch and return position data
+  console.log("5..5");
   return getDexPosition(ctx, poolHash, tickUpper, tickLower, positionId);
- }
+}
 
 /**
  * Retrieves a DexPositionData object from the ledger.
@@ -159,6 +162,6 @@ export async function getDexPosition(
     tickLower.toString(),
     positionId
   ]);
-
+  console.log("6..6");
   return getObjectByKey(ctx, DexPositionData, compositeKey);
 }
